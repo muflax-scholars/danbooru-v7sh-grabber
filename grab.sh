@@ -49,6 +49,22 @@ which() {
   return 1;
 )
 };
+dirname() {
+(
+  printf "%s" "$1" | sed 's|\(.*\)/[^/]*|\1|g;';
+  return 0;
+)
+};
+
+urlencode() {
+(
+  IFS="";
+  read -r input;
+  out="$(printf "%s" "${input}" | od -t x1 -v -w1 | sed 's/^[0-9]*//g;/^[[:space:]]*$/d;s/^[[:space:]]\+/%/g;' | while read -r line; do printf "%s" "${line}"; done)";
+  printf "%s" "${out}";
+  return 0;
+)
+};
 
 # should initialize hardcoded variables defaults and logic variables
 #
@@ -65,7 +81,6 @@ init() {
   else
     return 1;
   fi;
-  PATH="${PATH}:bin";
 # const
   c_anonymous_tag_limit="2";      # API const
   c_registred_tag_limit="6";      # API const
@@ -84,7 +99,7 @@ init() {
   l_tag_limit="0";                # defined in parse_args
 # path
   p_exec_dir="$(
-    scriptpath="$(printf "%s" "$(dirname $0)" | sed "s|\.\./[^/]*||g;s|^[./]*|/|g;")";
+    scriptpath="$(printf "%s" "$(dirname "$0")" | sed "s|\.\./[^/]*||g;s|^[./]*|/|g;")";
     firstchar="$(printf "%s" "${scriptpath}" | sed 's/^\(.\).*/\1/g;')";
     if [ "${firstchar}" = "/" ] && [ "${scriptpath}" != "/" ] && [ -e "${scriptpath}" ]; then
       printf "%s" "${scriptpath}";
@@ -227,7 +242,7 @@ parse_args() {
       ("-fd"|"--fail-delay") l_fail_delay="$(printf "%d" "$2" 2>>"${port_null}")"; [ "$2" ] && { shift; }; ;;
       ("-bd"|"--binary-downloader") b_downloader="$2"; [ "$2" ] && { shift; }; ;;
       ("-bh"|"--binary-hasher") b_hasher="$2"; [ "$2" ] && { shift; }; ;;
-      (*) s_tags="${s_tags}$1"; arg_s_tags="true"; ;;
+      (*) s_tags="${s_tags} $1"; arg_s_tags="true"; ;;
     esac;
     shift;
   done;
@@ -335,6 +350,9 @@ USAGE: '$0' [OPTIONS] <TAGS>
                deep        Gets actual number of images, but slower.
   -so  --search-order           <name|count|date>
                Search sort order.
+               date
+               count
+               name
                Default: '${l_search_order}'
   -sr  --searh-reverse
                Default: '${l_search_reverse_order}'
@@ -373,9 +391,8 @@ USAGE: '$0' [OPTIONS] <TAGS>
   You also may combine tags through their intersection using ' ' (space) without
   space and specify multiple tags using ',' (coma).
 
-  by Cirno for Cirnos
-";
-  notify 0 "${msg}";
+  by Cirno for Cirnos";
+  notify 0 "${msg}\n";
   return 0;
 )
 };
@@ -388,7 +405,7 @@ USAGE: '$0' [OPTIONS] <TAGS>
 help_atai() {
 (
   data="659658759531120655977442455993431078871375578775867522085448698961241785898320841875684479974177979228780136958592397761257995933576702158887582133231765767340336755676885982469867634093175555587573486759624075136866683296877866340679813767558979796330697977133477982312097689987961341";
-  notify 0 "$(printf "%s" "${data}" | sed "s/[$(printf "%s" "${data}" | sed 's/.*7\([6-8]\)87\(.\).*/\2/g;')-$(printf "%s" "${data}" | sed 's/.*673\(.\).*/\1/g;')]/#/g;s/[$(printf "%s" "${data}" | sed 's/.*\(.\)88875821332317657673403.*/\1/g;')-$(printf "%s" "${data}" | sed 's/.*18756844799741779792287801369585923\(.\).*/\1/g;')]/ /g;s/$(printf "%s" "${data}" | sed 's/.*3431078871375578775867522\(.\)[854]*869896124178589832.*/\1/g;')/\n/g;")\n";
+  notify 0 "$(printf "%s\n" "${data}" | sed "s/[$(printf "%s" "${data}" | sed 's/.*7\([6-8]\)87\(.\).*/\2/g;')-$(printf "%s" "${data}" | sed 's/.*673\(.\).*/\1/g;')]/#/g;s/[$(printf "%s" "${data}" | sed 's/.*\(.\)88875821332317657673403.*/\1/g;')-$(printf "%s" "${data}" | sed 's/.*18756844799741779792287801369585923\(.\).*/\1/g;')]/ /g;s/$(printf "%s" "${data}" | sed 's/.*3431078871375578775867522\(.\)[854]*869896124178589832.*/\1/g;')/\n/g;")\n";
   return 0;
 )
 };
@@ -427,26 +444,26 @@ write_conf() {
 l_write_conf='false'
 
 # Verbosity level. 
-# Default: '${l_verbose_level}'
+# Default: '3'
 # 0    no output.
 # 1    + errors and rusilts
 # 2    + progress display messages.
 # 3    + warning messages.
 # 4    + debug information
-l_verbose_level='${l_verbose_level}'
+l_verbose_level='3'
 
 # Directory for temp files.
 # Default: '${p_temp_dir}'
 p_temp_dir='${p_temp_dir}'
 
 # Action which is performed by default.
-# Default: '${l_mode}'
+# Default: 'search'
 # search   search specified tags
 # download download specified tags
-l_mode='${l_mode}'
+l_mode='search'
 
 # Download mechanism type. 
-# Default: '${l_download_mode}'
+# Default: 'onedir'
 # onedir           images for each specified tag will be saved to seperated 
 #                  directories.
 # samedir  l_verbosity_level        all images for all specified tags will be saved in one 
@@ -456,7 +473,7 @@ l_mode='${l_mode}'
 # samedir:symlinks same as samedir, but for each tag of each image will be 
 #                  created symlinks in other directories.
 # export           do not download, just print links in s_export_format
-l_download_mode='${l_download_mode}'
+l_download_mode='onedir'
 
 # Export format
 # Default: '${s_export_format}'
@@ -489,8 +506,8 @@ l_download_page_offset='${l_download_page_offset}'
 
 # Amount of images per page. According to danbooru API v1.13.0 must be in 1..100
 # range, but in fact, with no_checks=true option, can be over 1000.
-# Default: '${l_download_page_size}'
-l_download_page_size='${l_download_page_size}'
+# Default: '100'
+l_download_page_size='100'
 
 # Directory to which all images will be saved.
 # Default: '${p_storage_dir}'
@@ -501,18 +518,23 @@ p_storage_dir='${p_storage_dir}'
 p_storage_big_dir='${p_storage_big_dir}'
 
 # Search mechanism type.
-# Default: '${l_search_mode}'
+# Default: 'simple'
 # simple  Gets a little outdated number of images, but faster.
 # deep    Gets actual number of images, but slower.
-l_search_mode='${l_search_mode}'
+l_search_mode='simple'
 
 # Search sort order.
-# Default: '${l_search_order}'
-l_search_order='${l_search_order}'
+# Default: 'count'
+# name
+# count
+# date
+l_search_order='count'
 
 # Reverse search order.
-# Default: '${l_search_reverse_order}'
-l_search_reverse_order='${l_search_reverse_order}'
+# Default: 'false'
+# true
+# false
+l_search_reverse_order='false'
 
 # Danbooru account username.
 s_auth_string='${s_auth_string}'
@@ -534,8 +556,8 @@ l_fail_delay='${l_fail_delay}'
 
 # Do not perform any values checks before sending to server. Most likely useless
 # and even dangerous, if you do not understand what are you doing.
-# Default: '${l_validate_values}'
-l_validate_values='${l_validate_values}'
+# Default: 'true'
+l_validate_values='true'
 
 # Path with options to downloader programm. 'PATH' will be replaced with 
 # downloading file saving point, 'URL' with target url.
@@ -561,8 +583,10 @@ ask_to_make() {
   type="$1";
   path="$2";
   name="$3";
-  notify 2 "Enter ${name} path [${path}]: ";
-  read -r newpath;
+  if [ "${name}" != "force" ]; then
+    notify 2 "Enter ${name} path [${path}]: ";
+    read -r newpath;
+  fi;
   path="${newpath:-${path}}";
   if [ ! -e "${path}" ]; then
     case "${type}" in
@@ -571,7 +595,7 @@ ask_to_make() {
         write_conf;
       ;;
       ("dir")
-        mkdir "${path}";
+        mkdir -p "${path}";
       ;;
     esac;
   fi;
@@ -605,6 +629,9 @@ validate_values() {
     esac;
   fi;
   if [ ! -e "${p_conf_file}" ]; then
+    if [ ! -e "$(dirname "${p_conf_file}")" ]; then
+      ask_to_make "dir" "$(dirname "${p_conf_file}")" "force";
+    fi;
     p_conf_file="$(ask_to_make "conf" "${p_conf_file}" "configuration file")";
   fi;
 (
@@ -711,12 +738,12 @@ validate_values() {
   esac;
   IFS=",";
   for tag in ${s_tags}; do
-    tagcount="$(($(printf "%s" "${tag}" | grep -c " ")+1))";
+    tagcount="$(printf "%s" "${tag}" | wc -w)";
     if [ "${tagcount}" -gt "${l_tag_limit}" ]; then
       if [ "${s_auth_string}" ]; then
-        notify 1 "number of combinated tags can't be more then '${c_registred_tag_limit}' for registred user.\n";
+        notify 1 "number of intersecting tags ('${tag}') can't be more then ${c_registred_tag_limit}for registred user.\n";
       else
-        notify 1 "number of combinated tags can't be more then '${c_anonymous_tag_limit}' for anonymous user.\n";
+        notify 1 "number of intersecting tags ('${tag}') can't be more then ${c_anonymous_tag_limit} for anonymous user. You can rise it to ${c_registred_tag_limit} by registering and specifing username (-u,s_auth_login) and password (-p,s_auth_password_hash) options.\n";
       fi;
       return 18;
     fi;
@@ -734,8 +761,6 @@ validate_values() {
 };
 
 # should do actual downloading of API query replies and files
-#
-# ! very ugly realisation !
 #
 # args: type url local_filepath
 # output: query_reply
@@ -756,10 +781,13 @@ query() {
     arg="$(printf "%s" "${param}" | sed 's/=.*//g;')";
     case "${arg}" in
       ("tags"|"name")
-        value="$(printf "%s\n" "${param}" | sed 's/^[^=]*=//g;s/[[:space:]]\+/\n/g;' | while read -r tag; do printf "%s" "${tag} " | od -t x1 -v -w1 | sed 's/^[0-9]*//g;s/[[:space:]]\+/%/g;' | while read -r line; do printf "%s" "${line}"; done; done | sed 's/%20$//g;s/%20/+/g;')";
+        for tag in $(printf "%s" "${param}" | sed 's/^[^=]*=//g'); do
+          out="${out}+$(printf "%s" "${tag}" | urlencode)";
+        done;
+        value="$(printf "%s" "${out}" | sed 's/^+//g;')";
       ;;
       (*)
-        value="$(printf "%s" "${param}" | sed 's/^[^=]*=//g;' | od -v -t x1 -w1 | sed 's/^[0-9]*//g;s/[[:space:]]\+/%/g;' | while read -r line; do printf "%s" "${line}"; done)";
+        value="$(printf "%s" "${param}" | sed 's/^[^=]*=//g;' | urlencode)";
       ;;
     esac;
     url="${url}${arg}=${value}&";
@@ -786,7 +814,7 @@ get_file() {
   if [ -e "${local_filepath}" ]; then
     rm "${local_filepath}";
   fi;
-  exec_string="$(printf "%s" "${b_downloader}" | sed "s/PATH/${safe_filepath}/g;s/URL/${url_safe}/g;")";
+  exec_string="$(printf "%s\n" "${b_downloader}" | sed -e "s/PATH/${safe_filepath}/g;s/URL/${url_safe}/g;")";
   lim=10;
   while [ true ]; do
     while [ true ]; do
@@ -823,12 +851,16 @@ get_file() {
 
 get_count() {
 (
+  if [ "$1" = "persist" ]; then
+    persist="$1";
+    shift;
+  fi;
   tag="$1";
   tagcount="$(($(printf "%s" "${tag}" | grep -c " ")+1))";
   if [ "${tagcount}" -lt "${l_tag_limit}" ]; then
     tag="${tag} status:active";
   fi;
-  result="$(query "post" "limit=1,page=1,tags=${tag}" | sed -n '/<posts/{s/.*count="\([0-9]*\)".*/\1/p;};')";
+  result="$(query "post" "limit=1,page=1,tags=${tag}" ${persist} | sed -n '/<posts/{s/.*count="\([0-9]*\)".*/\1/p;};')";
   printf "%d" "${result}";
   return 0;
 )
@@ -838,30 +870,32 @@ search() {
 (
   tag="$1";
   result="$(query "tag" "order=${l_search_order},name=${tag}")" || { return 1; };
-  if printf "%s" "${tag}" | grep -q " "; then
+  if [ "$(printf "%s" "${tag}" | wc -w)" -ge 2 ]; then
     result="0 mixed ${tag}";
+    l_search_mode="deep";
   else
     result="$(printf "%s\n" "${result}" | sed -n '/<tag /{s/type="0"/type="general"/g;s/type="1"/type="artist"/g;s/type="3"/type="title"/g;s/type="4"/type="character"/g;s/.*type="\([^"]*\)" count="\([0-9]*\)".*name="\([^"]*\)".*/\2 \1 \3/g;p;};')";
     if [ "${l_search_result_reverse_order}" = "true" ]; then
       result="$(printf "%s\n" "${result}" | tac )";
     fi;
   fi;
-  case "${l_search_mode}" in
-    ("simple")
-      notify 0 "$(printf "%#10d %#9s %s\n" ${result})\n";
-    ;;
-    ("deep")
-      printf "%s\n" "${result}" | while read -r line; do
-        tag="$(printf "%s" "${line}" | cut -d' ' -f3)";
-        notify 0 "$(printf "%#10d %#9s %s\n" $(printf "%s" "${line}" | sed -s "s/^[0-9]*/$(get_count "${tag}")/g;"))\n";
-      done;
-    ;;
-  esac;
+  IFS=" ";
+  printf "%s\n" "${result}" | while read -r line; do
+    case "${l_search_mode}" in
+      ("simple")
+        notify 0 "$(printf "%#10s %#9s %s" ${line})\n";
+      ;;
+      ("deep")
+        type="$(printf "%s" "${line}" | cut -d' ' -f2)";
+        tag="$(printf "%s" "${line}" | cut -d' ' -f3-)";
+        notify 0 "$(printf "%#10d %#9s ${tag}\n" "$(get_count "${tag}")" "${type}")\n";
+      ;;
+    esac;
+  done;
   return 0;
 )
 };
 
-#"
 # file:count   file number
 # file:id      file id
 # file:height  file height
@@ -878,12 +912,52 @@ download() {
     s/file:tags/${post_tags}/g;
     s/file:md5/${post_md5}/g;
     s/[[:space:]]*&[#0-9a-zA-Z]*[[:space:]]*;//g;
-    s/[[:space:]]\{1,\}/-/g;
     s/^\(.\{,$((254-${#post_file_ext}))\}\).*/\1/g;
   ").${post_file_ext}";
-  notify 0 "$post_file_name\n"
+  tag="$(printf "${tag}" | sed 's,[\/:*?<>|"],,g;')";
+  case "${l_download_mode}" in
+    ("onedir"|"onedir:symlinks") file_path="${p_storage_dir}/${tag}/${post_file_name}"; ;;
+    ("samedir"|"samedir:symlinks") file_path="${p_storage_big_dir}/${post_file_name}"; ;;
+  esac;
+  if [ -e "${file_path}" ]; then
+    notify 2 "skip: ${file_path}\n";
+    return 0;
+  fi;
+  post_file_url="$(printf "%s" "${post_file_url}" | sed 's|\\/|\/|g')";
   tmpfile="${p_temp_dir}/danbooru_grabber_temp_content_file";
-  #query "file" "${post_file_url}" "${tmpfile}";
+  notify 2 "begin: ${file_path}\n";
+  get_file "${post_file_url}" "${tmpfile}";
+  case "${l_download_mode}" in
+    ("onedir")
+      if [ ! -d "${p_storage_dir}/${tag}" ]; then
+        mkdir "${p_storage_dir}/${tag}";
+      fi;
+      mv "${tmpfile}" "${file_path}";
+    ;;
+    ("samedir")
+      if [ ! -d "${p_storage_dir}/${tag}" ]; then
+        mkdir "${p_storage_dir}/${tag}";
+      fi;
+      mv "${tmpfile}" "${file_path}";
+    ;;
+    ("onedir:symlinks"|"samedir:symlinks")
+      if [ ! -d "${p_storage_dir}/${tag}" ]; then
+        mkdir "${p_storage_dir}/${tag}";
+      fi;
+      mv "${tmpfile}" "${file_path}";
+      IFS="-";
+      for i_tag in ${post_tags}; do
+        if [ "${i_tag}" = "${tag}" ]; then
+          continue;
+        fi;
+        if [ ! -d "${p_storage_dir}/${i_tag}" ]; then
+          mkdir "${p_storage_dir}/${i_tag}";
+        fi;
+        ln -s "${file_path}" "${p_storage_dir}/${i_tag}/";
+      done;
+    ;;
+  esac;
+  notify 2 "end: ${file_path}\n";
   return 0;
 )
 };
@@ -892,7 +966,11 @@ download() {
 parser() {
 (
   tag="$1";
-  total_count="$(get_count "${tag}")";
+  total_count="$(get_count "persist" "${tag}")";
+  if [ "${total_count}" -eq 0 ]; then
+    notify 1 "there is no tag '${tag}'.\n";
+    return 1;
+  fi;
   total_pages="$((${total_count}/${l_download_page_size}))";
   if [ "$((${total_count}%${l_download_page_size}))" -gt 0 ]; then
     total_pages="$((${total_pages}+1))";
@@ -912,6 +990,7 @@ parser() {
         for var in $vars; do
           read -r "$var";
         done;
+        post_tags="$(printf "%s" "${post_tags}" | sed 's,[\/:*?<>|"],,g;s/&/\\&/g;s/[[:space:]]\+/-/g;')";
         post_file_ext="$(printf "%s" "${post_file_url}" | sed 's/.*\.\(.\{,5\}\)$/\1/g')";
         case "${l_download_mode}" in
           ("export") export; ;;
@@ -935,6 +1014,7 @@ catch_error() {
 
 
 main() {
+  set +x;
   init || { return 1$?; };
   read_conf;
   parse_args "get_conf" "$@";
