@@ -738,7 +738,7 @@ validate_values() {
   esac;
   IFS=",";
   for tag in ${s_tags}; do
-    tagcount="$(printf "%s" "${tag}" | wc -w)";
+    tagcount="$(printf "%s" "${tag}" | wc -w | sed 's/\([0-9]*\).*/\1/g;')";
     if [ "${tagcount}" -gt "${l_tag_limit}" ]; then
       if [ "${s_auth_string}" ]; then
         notify 1 "number of intersecting tags ('${tag}') can't be more then ${c_registred_tag_limit}for registred user.\n";
@@ -870,7 +870,7 @@ search() {
 (
   tag="$1";
   result="$(query "tag" "order=${l_search_order},name=${tag}")" || { return 1; };
-  if [ "$(printf "%s" "${tag}" | wc -w)" -ge 2 ]; then
+  if [ "$(printf "%s" "${tag}" | wc -w | sed 's/\([0-9]*\).*/\1/g;')" -ge 2 ]; then
     result="0 mixed ${tag}";
     l_search_mode="deep";
   else
