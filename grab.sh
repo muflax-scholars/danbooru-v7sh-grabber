@@ -1,4 +1,4 @@
-#!/bin/ash
+#!/bin/sh
 
 # Used binaries:
 # sh cat cut sed grep od wc mv ln rm [ printf
