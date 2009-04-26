@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Used binaries:
-# sh cat cut sed grep od wc mv ln rm [ printf touch sleep
+# sh cat sed grep od wc mv ln rm [ printf touch sleep
 # wget/fetch
 # sha1/sha1sum
 
@@ -47,9 +47,7 @@ which() {
   program="$1";
   IFS=":";
   for element in ${PATH}; do
-    if [ ! "${element}" ]; then
-      element=".";
-    fi;
+    element="${element:-"."}";
     if [ -f "${element}/${program}" ] && [ -x "${element}/${program}" ]; then
       printf "%s" "${element}/${program}";
       break;
@@ -65,7 +63,7 @@ which() {
 # output:
 # side effect: defines variables
 init() {
-  g_version="Danbooru v7sh grabber v0.10.0 for Danbooru API v1.13.0";
+  g_version="Danbooru v7sh grabber v0.10.1 for Danbooru API v1.13.0";
 # const
   c_anonymous_tag_limit="2";      # API const
   c_registred_tag_limit="6";      # API const
@@ -82,6 +80,20 @@ init() {
   l_write_conf="false";            # "false" "true"
   l_fail_delay="10";               # 60 0..
   l_tag_limit="0";                 # defined in parse_args
+  if [ "$(which "wget")" ]; then
+    l_downloader="wget";
+  elif [ "$(which "fetch")" ]; then
+    l_downloader="fetch";
+  else
+    return 1;
+  fi;
+  if [ "$(which "sha1sum")" ]; then
+    l_hasher="sha1sum";
+  elif [ "$(which "sha1")" ]; then
+    l_hasher="sha1";
+  else
+    return 2;
+  fi;
 # path
   p_exec_dir="$(
     scriptpath="$(printf "%s" "$(dirname "$0")" | sed "s|\.\./[^/]*||g;s|^[./]+|/|g;")";
@@ -107,31 +119,13 @@ init() {
   s_tags="";
   s_rename_string="file:md5";
   s_export_format="file:url";
-  if [ "$(which "wget")" ]; then
-    b_downloader="wget -c -O PATH URL";
-    r_http_error_grep="ERROR [0-9]*";
-    r_http_error_sed="/ERROR/{s/.*ERROR //g;p;};";
-    r_http_error_resolve="unable to resolve host address";
-  elif [ "$(which "fetch")" ]; then
-    b_downloader="fetch -m -o PATH URL";
-    r_http_error_grep="fetch: http://[^:]*: [A-Z]";
-    r_http_error_sed="s/.*://g;p;";
-    r_http_error_resolve="No address record";
-  else
-    return 1;
-  fi;
-  # password hasher
-  if [ "$(which "sha1sum")" ]; then
-    b_hasher="sha1sum";
-  elif [ "$(which "sha1")" ]; then
-    b_hasher="sha1";
-  else
-    return 2;
-  fi;
 # args
   arg_tmp_password="false";
   return 0;
 };
+
+
+
 
 # should return directory name from given path
 #
@@ -218,7 +212,16 @@ password_hash() {
 (
   password_salt="$1";
   password="$(printf "%s" "$2" | sed 's,/,\\/,g;s,&,\\&,g;')";
-  printf "%s" "$(printf "%s" "${password_salt}" | sed "s/<password>/${password}/g;")" | ${b_hasher} | cut -d' ' -f1;
+  salted_pass="$(printf "%s" "${password_salt}" | sed "s/<password>/${password}/g;")";
+  case "${l_hasher}" in
+    ("sha1")
+      out="$(printf "%s" "${salted_pass}" | sha1 | sed 's/[^a-f0-9]//g;)";
+    ;;
+    ("sha1sum")
+      out="$(printf "%s" "${salted_pass}" | sha1sum | sed 's/[^a-f0-9]//g;)";
+    ;;
+  esac;
+  printf "%s" "${out}";
   return 0;
 )
 };
@@ -268,8 +271,6 @@ parse_args() {
       ("-ps"|"--password-salt") s_auth_password_salt="$2"; [ "$2" ] && { shift; }; ;;
       ("-url"|"--url") p_danbooru_url="$2"; [ "$2" ] && { shift; }; ;;
       ("-fd"|"--fail-delay") l_fail_delay="$(printf "%d" "$2" 2>/dev/null)"; [ "$2" ] && { shift; }; ;;
-      ("-bd"|"--binary-downloader") b_downloader="$2"; [ "$2" ] && { shift; }; ;;
-      ("-bh"|"--binary-hasher") b_hasher="$2"; [ "$2" ] && { shift; }; ;;
       (*) s_tags="${s_tags} $1"; arg_s_tags="true"; ;;
     esac;
     shift;
@@ -400,13 +401,6 @@ USAGE: '$0' [OPTIONS] <TAGS>
   -fd  --fail-delay             <0..>
                Delay in seconds to wait on query fail before try again.
                Default: '${l_fail_delay}'
-  -bd  --binary-downloader      <EXEC PATH, OPTIONS>
-               Path with options to downloader programm. 'PATH' will be replaced
-               with downloading file saving point, 'URL' with target url.
-               Default: '${b_downloader}'
-  -bh  --binary-hasher          <EXEC PATH, OPTIONS>
-               Path with options to sha1 hash generator programm.
-               Default: '${b_hasher}'
   -n   --no-checks
                Do not perform any values checks before sending to server. Most
                likely useless and even dangerous, if you do not understand what
@@ -576,7 +570,7 @@ s_auth_password_hash='${s_auth_password_hash}'
 s_auth_password_salt='${s_auth_password_salt}'
 
 # Danbooru URL.
-# Default: '${p_danbooru_urb_hasherl}'
+# Default: '${p_danbooru_url}'
 p_danbooru_url='${p_danbooru_url}'
 
 # Delay in seconds to wait on query fail before try again.
@@ -587,15 +581,6 @@ l_fail_delay='${l_fail_delay}'
 # and even dangerous, if you do not understand what are you doing.
 # Default: 'true'
 l_validate_values='true'
-
-# Path with options to downloader programm. 'PATH' will be replaced with 
-# downloading file saving point, 'URL' with target url.
-# Default: '${b_downloader}'
-b_downloader='${b_downloader}'
-
-# Path with options to sha1 hash generator programm.
-# Default: '${b_hasher}'
-b_hasher='${b_hasher}'
 ";
   printf "%s" "${config}" > "${p_conf_file}";
   return 0;
@@ -690,14 +675,6 @@ validate_values() {
     notify 1 "'${p_danbooru_url}' is not valid danbooru url for p_danbooru_url (-url).\n";
     return 6;
   fi;
-  if printf "%s" "${b_downloader}" | grep -vq "\(PATH\|URL\)"; then
-    notify 1 "b_downloader (-bd) must containt 'PATH' and 'URL' tokens.\n";
-    return 7;
-  fi;
-  if [ ! "${b_hasher}" ]; then
-    notify 1 "b_hasher (-bh) must not be null.\n";
-    return 8;
-  fi;
   case "${l_write_conf}" in
     ("true"|"false") ;;
     (*)
@@ -778,14 +755,6 @@ validate_values() {
       return 18;
     fi;
   done;
-  if [ ! "${b_downloader}" ]; then
-    notify 1 "Not wget not fetch binaries not found in system.\n";
-    return 19;
-  fi;
-  if [ ! "${b_hasher}" ]; then
-    notify 1 "Not sha1 not sha1sum binaries not found in system.\n";
-    return 20;
-  fi;
   return 0;
 )
 };
@@ -830,6 +799,43 @@ query() {
 )
 };
 
+# should just try to download files
+#
+# args: url local_path
+# output:
+# side effect: saves file to local path
+downloader() {
+(
+  url="$1";
+  local_filepath="$2";
+  case "${l_downloader}" in
+    ("wget")
+      result="$(wget -c -O "${local_filepath}" "${url}" 2>&1)" || {
+        if printf "%s" "${result}" | grep -q "ERROR [0-9]*"; then
+          printf "%s" "${result}" | sed -n "/ERROR/{s/.*ERROR //g;p;};";
+          return 1;
+        fi;
+        if printf "%s" "${result}" | grep -q "unable to resolve host address"; then
+          return 2;
+        fi;
+      };
+    ;;
+    ("fetch")
+      result="$(fetch -m -o "${local_filepath}" "${url}")" || {
+        if printf "%s" "${result}" | grep -q "fetch: http://[^:]*: [A-Z]"; then
+          printf "%s" "${result}" | sed -n "s/.*://g;p;";
+          return 1;
+        fi;
+        if printf "%s" "${result}" | grep -q "No address record"; then
+          return 2;
+        fi;
+      };
+    ;;
+  esac;
+  return 0;
+)
+};
+
 # should download files and handle download errors
 #
 # args: url local_path
@@ -844,29 +850,19 @@ get_file() {
   fi;
   url="$1";
   local_filepath="$2";
-  url_safe="$(printf "%s" "${url}" | sed 's,/,\\/,g;s,&,\\&,g;')";
-  safe_filepath="$(printf "%s" "${local_filepath}" | sed 's,/,\\/,g;s,&,\\&,g;')";
+#  url_safe="$(printf "%s" "${url}" | sed 's,/,\\/,g;s,&,\\&,g;')";
+#  safe_filepath="$(printf "%s" "${local_filepath}" | sed 's,/,\\/,g;s,&,\\&,g;')";
   if [ -e "${local_filepath}" ]; then
     rm "${local_filepath}";
   fi;
-  exec_string="$(printf "%s\n" "${b_downloader}" | sed -e "s/PATH/${safe_filepath}/g;s/URL/${url_safe}/g;")";
-  lim=10;
   while [ true ]; do
     while [ true ]; do
-      result="$(LANG="C" ${exec_string} 2>&1)" && { break; } || {
-        if [ "${persist}" != "true" ]; then
-          lim="$((${lim}-1))";
-          if [ "${lim}" -le 0 ]; then
-            return 1;
-          fi;
-        fi;
-      };
-      if printf "%s" "${result}" | grep -q "${r_http_error_grep}"; then
-        notify 3 "HTTP ERROR $(printf "%s" "${result}" | sed -n "${r_http_error_sed}")\n";
-      fi;
-      if printf "%s" "${result}" | grep -q "${r_http_error_resolve}"; then
-        notify 1 "unable to resolve host address '${url}'.\n";
-      fi;
+      result="$(downloader "${url}" "${local_filepath}")";
+      case "$?" in
+        (0) break; ;;
+        (1) notify 3 "HTTP ERROR "${result}"\n"; ;;
+        (2) notify 1 "unable to resolve host address '${url}'.\n"; ;;
+      esac;
       sleep "${l_fail_delay}";
     done;
 # tested on ~30 thousands of images without any single match, so considired as image-binary-safe.
@@ -1090,6 +1086,7 @@ parser() {
 # side effect: works sometimes
 main() {
   set +x;
+  set -f;
   init || { return 1$?; };
   read_conf;
   parse_args "get_conf" "$@";
