@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Used binaries:
-# sh cat cut sed grep od wc mv ln rm [ printf
+# sh cat cut sed grep od wc mv ln rm [ printf touch sleep
 # wget/fetch
 # sha1/sha1sum
 
