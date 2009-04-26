@@ -1,28 +1,37 @@
 #!/bin/ash
 
+# Used binaries:
+# sh cat cut sed grep od wc mv ln rm [ printf
+# wget/fetch
+# sha1/sha1sum
+
 # main script scheme
 # 
-#          init
-#           V
-# read default conf file
-#           V
-# get conf path from args
-#           V
-# read got conf file path
-#           V
-#       parse args
-#           V
-#     validate args
-#           V
-#    ---------------
-#    V             V
-#   download    search
-#    V             V
-#   query        query
-#    V             V
-#   download&    print
-#   rename      search
-#   files      results
+#             init
+#               V
+#    read default conf file
+#               V
+#    get conf path from args
+#               V
+#    read got conf file path
+#               V
+#          parse args
+#               V
+#         validate args
+#               V
+#    ------------------------
+#           V              V     
+#         parser       search
+#           V              V
+#   ----------------    query
+#    V            V        V
+#   download  export    print
+#    V            V    search
+#   query      query  results
+#    V            V
+#   download& export
+#   rename      file
+#   files       list
 
 #
 # should test if specified binary name at present in system
@@ -49,33 +58,6 @@ which() {
   return 1;
 )
 };
-dirname() {
-(
-  path="$1";
-  out="$(printf "%s" "$1" | sed 's|\(.*\)/[^/]*|\1|g;')";
-  printf "%s" "${out}";
-  return 0;
-)
-};
-
-urlencode() {
-(
-  IFS="";
-  read -r input;
-  out="$(printf "%s" "${input}" | od -t x1 -v | sed 's/^[0-9]*//g;s/[[:space:]]\{1,\}/%/g;s/[%]*$//g;' | while read -r line; do printf "%s" "${line}"; done)";
-  printf "%s" "${out}";
-  return 0;
-)
-};
-
-dateformat() {
-(
-  date="$1";
-  out="$(printf "%s" "${date}" | sed 's/^[a-zA-Z]*[[:space:]]*\([a-zA-Z]*\)[[:space:]]*\([0-9]*\)[[:space:]]*\([0-9]*\):\([0-9]*\):\([0-9]*\)[[:space:]]*[0-9+-]*[[:space:]]*\([0-9]*\)/\6\1\2\3\4.\5/g;s/Jan/01/g;s/Feb/02/g;s/Mar/03/g;s/Apr/04/g;s/May/05/g;s/Jun/06/g;s/Jul/07/g;s/Aug/08/g;s/Sep/09/g;s/Oct/10/g;s/Nov/11/g;s/Dec/12/g;')";
-  printf "%s" "${out}";
-  return 0;
-)
-};
 
 # should initialize hardcoded variables defaults and logic variables
 #
@@ -88,18 +70,18 @@ init() {
   c_anonymous_tag_limit="2";      # API const
   c_registred_tag_limit="6";      # API const
 # logic
-  l_mode="search";                # "search" "download"
-  l_search_mode="simple"          # "simple" "deep"
-  l_search_order="count";         # "count" "name" "date"
-  l_search_reverse_order="false"; # "false" "true"
-  l_download_mode="onedir";       # "onedir" "onedir:symlinks" "samedir" "samedir:symlinks"
-  l_download_page_size="100";     # 100 1..100..*
-  l_download_page_offset="1";     # 1 1..
-  l_verbose_level="3";            # 3 0..4
-  l_validate_values="true";       # "true" "false"
-  l_write_conf="false";           # "false" "true"
-  l_fail_delay="60";              # 60 0..
-  l_tag_limit="0";                # defined in parse_args
+  l_mode="search";                 # "search" "download"
+  l_search_mode="simple"           # "simple" "deep"
+  l_search_order="count";          # "count" "name" "date"
+  l_search_reverse_order="false";  # "false" "true"
+  l_download_mode="onedir";        # "onedir" "onedir:symlinks" "samedir" "samedir:symlinks"
+  l_download_page_size="100";      # 100 1..100..*
+  l_download_page_offset="1";      # 1 1..
+  l_verbose_level="3";             # 3 0..4
+  l_validate_values="true";        # "true" "false"
+  l_write_conf="false";            # "false" "true"
+  l_fail_delay="60";               # 60 0..
+  l_tag_limit="0";                 # defined in parse_args
 # path
   p_exec_dir="$(
     scriptpath="$(printf "%s" "$(dirname "$0")" | sed "s|\.\./[^/]*||g;s|^[./]+|/|g;")";
@@ -149,6 +131,49 @@ init() {
 # args
   arg_tmp_password="false";
   return 0;
+};
+
+# should return directory name from given path
+#
+# args: path
+# output: dirname
+# side effect:
+dirname() {
+(
+  path="$1";
+  out="$(printf "%s" "$1" | sed 's|\(.*\)/[^/]*|\1|g;')";
+  printf "%s" "${out}";
+  return 0;
+)
+};
+
+# should do urlencoding
+#
+# args: string
+# output: encoded string
+# side effect:
+urlencode() {
+(
+  IFS="";
+  read -r input;
+  out="$(printf "%s" "${input}" | od -t x1 -v | sed 's/^[0-9]*//g;s/[[:space:]]\{1,\}/%/g;s/[%]*$//g;' | while read -r line; do printf "%s" "${line}"; done)";
+  printf "%s" "${out}";
+  return 0;
+)
+};
+
+# should return date and time in YYYYmmddHHMM.SS format
+#
+# args: unformated time
+# output: formated time
+# side effect:
+dateformat() {
+(
+  date="$1";
+  out="$(printf "%s" "${date}" | sed 's/^[a-zA-Z]*[[:space:]]*\([a-zA-Z]*\)[[:space:]]*\([0-9]*\)[[:space:]]*\([0-9]*\):\([0-9]*\):\([0-9]*\)[[:space:]]*[0-9+-]*[[:space:]]*\([0-9]*\)/\6\1\2\3\4.\5/g;s/Jan/01/g;s/Feb/02/g;s/Mar/03/g;s/Apr/04/g;s/May/05/g;s/Jun/06/g;s/Jul/07/g;s/Aug/08/g;s/Sep/09/g;s/Oct/10/g;s/Nov/11/g;s/Dec/12/g;')";
+  printf "%s" "${out}";
+  return 0;
+)
 };
 
 # should print message, if message_level is lesser or equal l_verbose_level
@@ -391,8 +416,8 @@ USAGE: '$0' [OPTIONS] <TAGS>
   Hardcoded defaults -> Default config -> -c Specified config 
   -> Command-line options
 
-  You also may combine tags through their intersection using ' ' (space) without
-  space and specify multiple tags using ',' (coma).
+  You also can combine tags through their intersection using ' ' (space) and 
+  specify multiple tags for batch process using ',' (coma).
 
   by Cirno for Cirnos";
   notify 0 "${msg}\n";
@@ -764,11 +789,11 @@ validate_values() {
 )
 };
 
-# should do actual downloading of API query replies and files
+# should process api queries, logging in and urlencoding
 #
-# args: type url local_filepath
+# args: type params ispersist
 # output: query_reply
-# side effect: saves files
+# side effect:
 query() {
 (
   type="$1";
@@ -804,6 +829,11 @@ query() {
 )
 };
 
+# should download files and handle download errors
+#
+# args: url local_path
+# output:
+# side effect: saves file to local path
 get_file() {
 (
   persist="false"; 
@@ -853,6 +883,11 @@ get_file() {
 )
 };
 
+# should get actual count of specified tag
+#
+# args: ispersist tag
+# output: count
+# side effect:
 get_count() {
 (
   if [ "$1" = "persist" ]; then
@@ -870,6 +905,11 @@ get_count() {
 )
 };
 
+# should search in tags by given wildcard
+#
+# args: wildcard
+# output:
+# side effect: print search results
 search() {
 (
   tag="$1";
@@ -900,12 +940,11 @@ search() {
 )
 };
 
-# file:count   file number
-# file:id      file id
-# file:height  file height
-# file:width   file width
-# file:tags    file tags
-# file:md5     file md5 hash
+# should download, move and rename files
+#
+# args:
+# output:
+# side effect: downloads, moves and renames files
 download() {
 (
   post_file_name="$(printf "%s" "${s_rename_string}" | sed "
@@ -918,17 +957,17 @@ download() {
     s/[[:space:]]*&[#0-9a-zA-Z]*[[:space:]]*;//g;
     s/^\(.\{0,$((254-${#post_file_ext}))\}\).*/\1/g;
   ").${post_file_ext}";
+  notify 2 "    downloading file ${post_file_name} ($(printf "%0${#total_count}d" "${count}")/${total_count})...";
   case "${l_download_mode}" in
     ("onedir"|"onedir:symlinks") file_path="${p_storage_dir}/${safe_tag}/${post_file_name}"; ;;
     ("samedir"|"samedir:symlinks") file_path="${p_storage_big_dir}/${post_file_name}"; ;;
   esac;
   if [ -e "${file_path}" ]; then
-    notify 2 "skip: ${file_path}\n";
+    notify 2 "skip\n";
     return 0;
   fi;
   post_file_url="$(printf "%s" "${post_file_url}" | sed 's|\\/|\/|g')";
   tmpfile="${p_temp_dir}/danbooru_grabber_temp_content_file";
-  notify 2 "begin: ${file_path}\n";
   get_file "${post_file_url}" "${tmpfile}";
   case "${l_download_mode}" in
     ("onedir")
@@ -964,11 +1003,16 @@ download() {
       done;
     ;;
   esac;
-  notify 2 " end: ${file_path}\n";
+  notify 2 "done\n";
   return 0;
 )
 };
 
+# should export file list
+#
+# args:
+# output:
+# side effect: prints file list
 export_out() {
 (
   string="$(printf "%s" "${s_export_format}" | sed "
@@ -987,10 +1031,15 @@ export_out() {
 )
 };
 
-
+# should parse api data replise
+#
+# args: tag
+# output:
+# side effect: do all the stuff
 parser() {
 (
   tag="$1";
+  notify 2 "Begining downloading for tag '${tag}'.\n";
   total_count="$(get_count "persist" "${tag}")";
   if [ "${total_count}" -eq 0 ]; then
     notify 1 "there is no tag '${tag}'.\n";
@@ -1002,6 +1051,7 @@ parser() {
   fi;
   page="${l_download_page_offset}";
   while [ "${page}" -le "${total_pages}" ]; do
+    notify 2 "  Switching to page ${page} of ${total_pages}.\n";
     count="$((${page}*${l_download_page_size}-${l_download_page_size}+1))";
     result="$(query "post" "limit=${l_download_page_size},page=${page},tags=${tag}" "persist" | sed -n '/<post /{p;};')";
     printf "%s\n" "${result}" | while read -r post; do
@@ -1027,18 +1077,16 @@ parser() {
     done;
     page="$((${page}+1))";
   done;
+  notify 2 "Downloading for tag '${tag}' has been finished.\n";
   return 0;
 )
 };
 
-catch_error() {
-(
-  notify 4 "$(printf "INTERNAL ERROR %d%02d" "$1" "$?")\n";
-  return 0;
-)
-};
-
-
+# should do everything that this grabber should
+#
+# args:
+# output:
+# side effect: works sometimes
 main() {
   set +x;
   init || { return 1$?; };
@@ -1051,10 +1099,10 @@ main() {
     (0) ;;
     (1) help; return 0; ;;
     (2) help_atai; return 0; ;;
-    (*) catch_error 1; return "1$?";
+    (*) return "2$?";
   esac;
   if [ "${l_validate_values}" = "true" ]; then
-    validate_values || { catch_error 2; return "2$?"; };
+    validate_values || { return "3$?"; };
   fi;
   if [ "${l_write_conf}" = "true" ]; then
     write_conf "${p_conf_file}";
@@ -1071,4 +1119,5 @@ main() {
 )
 };
 
-main "$@" && { exit 0; } || { exit "$?"; }
+# main grabber code. yes, it is actualy one-liner.
+main "$@"; exit "$?";
