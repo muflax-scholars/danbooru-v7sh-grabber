@@ -80,7 +80,7 @@ init() {
   l_verbose_level="3";             # 3 0..4
   l_validate_values="true";        # "true" "false"
   l_write_conf="false";            # "false" "true"
-  l_fail_delay="60";               # 60 0..
+  l_fail_delay="10";               # 60 0..
   l_tag_limit="0";                 # defined in parse_args
 # path
   p_exec_dir="$(
@@ -218,7 +218,7 @@ password_hash() {
 (
   password_salt="$1";
   password="$(printf "%s" "$2" | sed 's,/,\\/,g;s,&,\\&,g;')";
-  printf "%s" "$(printf "%s" "${password_salt}" | sed "s/<password>/${password}/g;")" | ${b_hasher};
+  printf "%s" "$(printf "%s" "${password_salt}" | sed "s/<password>/${password}/g;")" | ${b_hasher} | cut -d' ' -f1;
   return 0;
 )
 };
@@ -276,6 +276,8 @@ parse_args() {
   done;
   if [ "${arg_tmp_password}" = "true" ]; then
     s_auth_password_hash="$(password_hash "${s_auth_password_salt}" "${tmp_password}")";
+  fi;
+  if [ "${s_auth_login}" ] && [ "${s_auth_password_hash}" ]; then
     s_auth_string="&login=${s_auth_login}&password_hash=${s_auth_password_hash}";
   fi;
   if [ "${s_auth_string}" ]; then
@@ -383,7 +385,6 @@ USAGE: '$0' [OPTIONS] <TAGS>
                name
                Default: '${l_search_order}'
   -sr  --searh-reverse
-               Default: '${l_search_reverse_order}'
                Reverse search order.
   -u   --username               <USERNAME>
                Danbooru account username.
@@ -565,7 +566,7 @@ l_search_order='count'
 l_search_reverse_order='false'
 
 # Danbooru account username.
-s_auth_string='${s_auth_string}'
+s_auth_login='${s_auth_login}'
 
 # Danbooru account password hash.
 s_auth_password_hash='${s_auth_password_hash}'
@@ -770,7 +771,7 @@ validate_values() {
     tagcount="$(printf "%s" "${tag}" | wc -w)";
     if [ "${tagcount}" -gt "${l_tag_limit}" ]; then
       if [ "${s_auth_string}" ]; then
-        notify 1 "number of intersecting tags ('${tag}') can't be more then ${c_registred_tag_limit}for registred user.\n";
+        notify 1 "number of intersecting tags ('${tag}') can't be more then ${c_registred_tag_limit} for registred user.\n";
       else
         notify 1 "number of intersecting tags ('${tag}') can't be more then ${c_anonymous_tag_limit} for anonymous user. You can rise it to ${c_registred_tag_limit} by registering and specifing username (-u,s_auth_login) and password (-p,s_auth_password_hash) options.\n";
       fi;
