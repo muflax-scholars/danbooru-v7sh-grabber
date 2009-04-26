@@ -51,7 +51,9 @@ which() {
 };
 dirname() {
 (
-  printf "%s" "$1" | sed 's|\(.*\)/[^/]*|\1|g;';
+  path="$1";
+  out="$(printf "%s" "$1" | sed 's|\(.*\)/[^/]*|\1|g;')";
+  printf "%s" "${out}";
   return 0;
 )
 };
@@ -60,7 +62,16 @@ urlencode() {
 (
   IFS="";
   read -r input;
-  out="$(printf "%s" "${input}" | od -t x1 -v -w1 | sed 's/^[0-9]*//g;/^[[:space:]]*$/d;s/^[[:space:]]\+/%/g;' | while read -r line; do printf "%s" "${line}"; done)";
+  out="$(printf "%s" "${input}" | od -t x1 -v | sed 's/^[0-9]*//g;s/[[:space:]]\{1,\}/%/g;s/[%]*$//g;' | while read -r line; do printf "%s" "${line}"; done)";
+  printf "%s" "${out}";
+  return 0;
+)
+};
+
+dateformat() {
+(
+  date="$1";
+  out="$(printf "%s" "${date}" | sed 's/^[a-zA-Z]*[[:space:]]*\([a-zA-Z]*\)[[:space:]]*\([0-9]*\)[[:space:]]*\([0-9]*\):\([0-9]*\):\([0-9]*\)[[:space:]]*[0-9+-]*[[:space:]]*\([0-9]*\)/\6\1\2\3\4.\5/g;s/Jan/01/g;s/Feb/02/g;s/Mar/03/g;s/Apr/04/g;s/May/05/g;s/Jun/06/g;s/Jul/07/g;s/Aug/08/g;s/Sep/09/g;s/Oct/10/g;s/Nov/11/g;s/Dec/12/g;')";
   printf "%s" "${out}";
   return 0;
 )
@@ -73,14 +84,6 @@ urlencode() {
 # side effect: defines variables
 init() {
   g_version="Danbooru v7sh grabber v0.10.0 for Danbooru API v1.13.0";
-# portability
-  if [ -c "/dev/null" ]; then
-    port_null="/dev/null";
-  elif [ -e "NUL:" ]; then
-    port_null="NUL:";
-  else
-    return 1;
-  fi;
 # const
   c_anonymous_tag_limit="2";      # API const
   c_registred_tag_limit="6";      # API const
@@ -99,7 +102,7 @@ init() {
   l_tag_limit="0";                # defined in parse_args
 # path
   p_exec_dir="$(
-    scriptpath="$(printf "%s" "$(dirname "$0")" | sed "s|\.\./[^/]*||g;s|^[./]*|/|g;")";
+    scriptpath="$(printf "%s" "$(dirname "$0")" | sed "s|\.\./[^/]*||g;s|^[./]+|/|g;")";
     firstchar="$(printf "%s" "${scriptpath}" | sed 's/^\(.\).*/\1/g;')";
     if [ "${firstchar}" = "/" ] && [ "${scriptpath}" != "/" ] && [ -e "${scriptpath}" ]; then
       printf "%s" "${scriptpath}";
@@ -224,7 +227,7 @@ parse_args() {
       ("-s"|"--search") l_action="search"; ;;
       ("-sr"|"--search-reverse") l_search_reverse_order="true"; ;;
       ("-n"|"--no-checks") l_validate_values="false"; ;;
-      ("-v"|"--verbosity") l_verbose_level="$(printf "%d" "$2" 2>>"${port_null}")"; [ "$2" ] && { shift; } ; ;;
+      ("-v"|"--verbosity") l_verbose_level="$(printf "%d" "$2" 2>/dev/null)"; [ "$2" ] && { shift; } ; ;;
       ("-td"|"--tempdir") p_temp_dir="$2"; [ "$2" ] && { shift; }; ;;
       ("-dm"|"--download-mode") l_download_mode="$2"; [ "$2" ] && { shift; }; ;;
       ("-def"|"--download-export-format") s_export_format="$2"; [ "$2" ] && { shift; }; ;;
@@ -239,7 +242,7 @@ parse_args() {
       ("-p"|"--password") tmp_password="$2"; arg_tmp_password="true"; [ "$2" ] && { shift; }; ;;
       ("-ps"|"--password-salt") s_auth_password_salt="$2"; [ "$2" ] && { shift; }; ;;
       ("-url"|"--url") p_danbooru_url="$2"; [ "$2" ] && { shift; }; ;;
-      ("-fd"|"--fail-delay") l_fail_delay="$(printf "%d" "$2" 2>>"${port_null}")"; [ "$2" ] && { shift; }; ;;
+      ("-fd"|"--fail-delay") l_fail_delay="$(printf "%d" "$2" 2>/dev/null)"; [ "$2" ] && { shift; }; ;;
       ("-bd"|"--binary-downloader") b_downloader="$2"; [ "$2" ] && { shift; }; ;;
       ("-bh"|"--binary-hasher") b_hasher="$2"; [ "$2" ] && { shift; }; ;;
       (*) s_tags="${s_tags} $1"; arg_s_tags="true"; ;;
@@ -315,7 +318,7 @@ USAGE: '$0' [OPTIONS] <TAGS>
                file:count        file number
                file:id           file id
                file:parent_id    file parent id
-               file:source       file source
+               file:source       file source url
   -dpo --download-page-offset   <1..>
                From which page begin grabbing.
                Default: '${l_download_page_offset}'
@@ -405,7 +408,7 @@ USAGE: '$0' [OPTIONS] <TAGS>
 help_atai() {
 (
   data="659658759531120655977442455993431078871375578775867522085448698961241785898320841875684479974177979228780136958592397761257995933576702158887582133231765767340336755676885982469867634093175555587573486759624075136866683296877866340679813767558979796330697977133477982312097689987961341";
-  notify 0 "$(printf "%s\n" "${data}" | sed "s/[$(printf "%s" "${data}" | sed 's/.*7\([6-8]\)87\(.\).*/\2/g;')-$(printf "%s" "${data}" | sed 's/.*673\(.\).*/\1/g;')]/#/g;s/[$(printf "%s" "${data}" | sed 's/.*\(.\)88875821332317657673403.*/\1/g;')-$(printf "%s" "${data}" | sed 's/.*18756844799741779792287801369585923\(.\).*/\1/g;')]/ /g;s/$(printf "%s" "${data}" | sed 's/.*3431078871375578775867522\(.\)[854]*869896124178589832.*/\1/g;')/\n/g;")\n";
+  notify 0 "$(printf "%s\n" "${data}" | sed "s/[$(printf "%s" "${data}" | sed 's/.*7\([6-8]\)87\(.\).*/\2/g;')-$(printf "%s" "${data}" | sed 's/.*673\(.\).*/\1/g;')]/#/g;s/[$(printf "%s" "${data}" | sed 's/.*\(.\)88875821332317657673403.*/\1/g;')-$(printf "%s" "${data}" | sed 's/.*18756844799741779792287801369585923\(.\).*/\1/g;')]/ /g;s/$(printf "%s" "${data}" | sed 's/.*3431078871375578775867522\(.\)[854]*869896124178589832.*/\1/g;')/\\\\n/g;")\n";
   return 0;
 )
 };
@@ -714,8 +717,9 @@ validate_values() {
       case "${l_download_mode}" in
         ("onedir"|"onedir:symlinks") ;;
         ("samedir"|"samedir:symlinks") ;;
+        ("export") ;;
         (*)
-          notify 1 "l_download_mode (-dm) must be 'onedir', 'onedir:symlinks', 'samedir' or 'samedir:symlinks'.\n";
+          notify 1 "l_download_mode (-dm) must be 'onedir', 'onedir:symlinks', 'samedir', 'samedir:symlinks' or 'export'.\n";
           return 14;
         ;;
       esac;
@@ -738,7 +742,7 @@ validate_values() {
   esac;
   IFS=",";
   for tag in ${s_tags}; do
-    tagcount="$(printf "%s" "${tag}" | wc -w | sed 's/\([0-9]*\).*/\1/g;')";
+    tagcount="$(printf "%s" "${tag}" | wc -w)";
     if [ "${tagcount}" -gt "${l_tag_limit}" ]; then
       if [ "${s_auth_string}" ]; then
         notify 1 "number of intersecting tags ('${tag}') can't be more then ${c_registred_tag_limit}for registred user.\n";
@@ -870,7 +874,7 @@ search() {
 (
   tag="$1";
   result="$(query "tag" "order=${l_search_order},name=${tag}")" || { return 1; };
-  if [ "$(printf "%s" "${tag}" | wc -w | sed 's/\([0-9]*\).*/\1/g;')" -ge 2 ]; then
+  if [ "$(printf "%s" "${tag}" | wc -w)" -ge 2 ]; then
     result="0 mixed ${tag}";
     l_search_mode="deep";
   else
@@ -912,11 +916,10 @@ download() {
     s/file:tags/${post_tags}/g;
     s/file:md5/${post_md5}/g;
     s/[[:space:]]*&[#0-9a-zA-Z]*[[:space:]]*;//g;
-    s/^\(.\{,$((254-${#post_file_ext}))\}\).*/\1/g;
+    s/^\(.\{0,$((254-${#post_file_ext}))\}\).*/\1/g;
   ").${post_file_ext}";
-  tag="$(printf "${tag}" | sed 's,[\/:*?<>|"],,g;')";
   case "${l_download_mode}" in
-    ("onedir"|"onedir:symlinks") file_path="${p_storage_dir}/${tag}/${post_file_name}"; ;;
+    ("onedir"|"onedir:symlinks") file_path="${p_storage_dir}/${safe_tag}/${post_file_name}"; ;;
     ("samedir"|"samedir:symlinks") file_path="${p_storage_big_dir}/${post_file_name}"; ;;
   esac;
   if [ -e "${file_path}" ]; then
@@ -929,35 +932,57 @@ download() {
   get_file "${post_file_url}" "${tmpfile}";
   case "${l_download_mode}" in
     ("onedir")
-      if [ ! -d "${p_storage_dir}/${tag}" ]; then
-        mkdir "${p_storage_dir}/${tag}";
+      if [ ! -d "${p_storage_dir}/${safe_tag}" ]; then
+        mkdir "${p_storage_dir}/${safe_tag}";
       fi;
       mv "${tmpfile}" "${file_path}";
+      touch -acm -t "$(dateformat "${post_created_at}")" "${file_path}";
     ;;
     ("samedir")
-      if [ ! -d "${p_storage_dir}/${tag}" ]; then
-        mkdir "${p_storage_dir}/${tag}";
+      if [ ! -d "${p_storage_dir}/${safe_tag}" ]; then
+        mkdir "${p_storage_dir}/${safe_tag}";
       fi;
       mv "${tmpfile}" "${file_path}";
+      touch -acm -t "$(dateformat "${post_created_at}")" "${file_path}";
     ;;
     ("onedir:symlinks"|"samedir:symlinks")
-      if [ ! -d "${p_storage_dir}/${tag}" ]; then
-        mkdir "${p_storage_dir}/${tag}";
+      if [ ! -d "${p_storage_dir}/${safe_tag}" ]; then
+        mkdir "${p_storage_dir}/${safe_tag}";
       fi;
       mv "${tmpfile}" "${file_path}";
+      touch -acm -t "$(dateformat "${post_created_at}")" "${file_path}";
       IFS="-";
       for i_tag in ${post_tags}; do
-        if [ "${i_tag}" = "${tag}" ]; then
+        if [ "${i_tag}" = "${safe_tag}" ]; then
           continue;
         fi;
         if [ ! -d "${p_storage_dir}/${i_tag}" ]; then
           mkdir "${p_storage_dir}/${i_tag}";
         fi;
         ln -s "${file_path}" "${p_storage_dir}/${i_tag}/";
+        touch -acm -t "$(dateformat "${post_created_at}")" "${p_storage_dir}/${i_tag}/${post_file_name}";
       done;
     ;;
   esac;
-  notify 2 "end: ${file_path}\n";
+  notify 2 " end: ${file_path}\n";
+  return 0;
+)
+};
+
+export_out() {
+(
+  string="$(printf "%s" "${s_export_format}" | sed "
+    s/file:url/${post_file_url}/g;
+    s/file:preview_url/${post_preview_url}/g;
+    s/file:sample_url/${post_sample_url}/g;
+    s/file:tags/${post_tags}/g;
+    s/file:md5/${post_md5}/g;
+    s/file:count/$(printf "%0${#total_count}d" "${count}")/g;
+    s/file:id/${post_id}/g;
+    s/file:parent_id/${post_parent_id}/g;
+    s/file:source/${post_source}/g;
+  ")";
+  notify 0 "${string}\n";
   return 0;
 )
 };
@@ -980,7 +1005,7 @@ parser() {
     count="$((${page}*${l_download_page_size}-${l_download_page_size}+1))";
     result="$(query "post" "limit=${l_download_page_size},page=${page},tags=${tag}" "persist" | sed -n '/<post /{p;};')";
     printf "%s\n" "${result}" | while read -r post; do
-      printf "%s" "${post}" | sed 's/[^"]*"\([^"]*\)"/\1\n/g;s/\/>//g;s/&/\\&/g;s|/|\\/|g;' | (
+      printf -- "$(printf "%s" "${post}" | sed 's/[^"]*"\([^"]*\)"/\1\\n/g;s/\/>//g;s/&/\\&/g;s|/|\\\\/|g;')" | (
         vars="post_score post_preview_width post_tags post_created_at post_height\
               post_md5 post_file_url post_preview_url post_preview_height\
               post_creator_id post_sample_url post_sample_width post_status\
@@ -990,10 +1015,11 @@ parser() {
         for var in $vars; do
           read -r "$var";
         done;
-        post_tags="$(printf "%s" "${post_tags}" | sed 's,[\/:*?<>|"],,g;s/&/\\&/g;s/[[:space:]]\+/-/g;')";
-        post_file_ext="$(printf "%s" "${post_file_url}" | sed 's/.*\.\(.\{,5\}\)$/\1/g')";
+        post_tags="$(printf "%s" "${post_tags}" | sed 's,[/],,g;s/&/\\&/g;s/[[:space:]]\{1,\}/-/g;')";
+        safe_tag="$(printf "%s" "${tag}" | sed 's,[/],,g;s/&/\\&/g;s/[[:space:]]\{1,\}/-/g;')";
+        post_file_ext="$(printf "%s" "${post_file_url}" | sed 's/.*\.//g')";
         case "${l_download_mode}" in
-          ("export") export; ;;
+          ("export") export_out; ;;
           (*) download; ;;
         esac;
       );
