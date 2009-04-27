@@ -843,7 +843,7 @@ downloader() {
       };
     ;;
     ("fetch")
-      result="$(fetch -m -o "${local_filepath}" "${url}")" || {
+      result="$(fetch -m -o "${local_filepath}" "${url}" 2>&1)" || {
         if printf "%s" "${result}" | grep -q "fetch: http://[^:]*: [A-Z]"; then
           printf "%s" "${result}" | sed -n "s/.*://g;p;";
           return 1;
