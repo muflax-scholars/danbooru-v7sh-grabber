@@ -795,7 +795,7 @@ query() {
     ("tag") url="${p_danbooru_url}/tag/index.xml?"; ;;
     ("post") url="${p_danbooru_url}/post/index.xml?"; ;;
   esac;
-  temp_file="${p_temp_dir}/danbooru_grabber_query_result";
+  temp_file="${p_temp_dir}/$$-danbooru_grabber_query_result";
   IFS=",";
   for param in ${params}; do
     IFS=" ";
@@ -986,7 +986,7 @@ download() {
     return 0;
   fi;
   post_file_url="$(printf "%s" "${post_file_url}" | sed 's|\\/|\/|g')";
-  tmpfile="${p_temp_dir}/danbooru_grabber_temp_content_file";
+  tmpfile="${p_temp_dir}/$$-danbooru_grabber_temp_content_file";
   get_file "${post_file_url}" "${tmpfile}";
   case "${l_download_mode}" in
     ("onedir")
