@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Used binaries:
-# sh cat sed grep od wc mv ln rm [ printf touch sleep
+# sh cat sed grep od wc mv ln rm [ printf touch sleep cut
 # wget/fetch
 # sha1/sha1sum
 
@@ -33,37 +33,13 @@
 #   rename      file
 #   files       list
 
-#
-# should test if specified binary name at present in system
-#
-# args: binaryname
-# output: binarypath
-# side effect:
-which() {
-(
-  case "${PATH}" in
-    (*[!:]:) PATH="${PATH}:"; ;;
-  esac;
-  program="$1";
-  IFS=":";
-  for element in ${PATH}; do
-    element="${element:-"."}";
-    if [ -f "${element}/${program}" ] && [ -x "${element}/${program}" ]; then
-      printf "%s" "${element}/${program}";
-      break;
-    fi;
-  done;
-  return 1;
-)
-};
-
 # should initialize hardcoded variables defaults and logic variables
 #
 # args:
 # output:
 # side effect: defines variables
 init() {
-  g_version="Danbooru v7sh grabber v0.10.1 for Danbooru API v1.13.0";
+  g_version="Danbooru v7sh grabber v0.10.2 for Danbooru API v1.13.0";
 # const
   c_anonymous_tag_limit="2";      # API const
   c_registred_tag_limit="6";      # API const
@@ -78,34 +54,24 @@ init() {
   l_verbose_level="3";             # 3 0..4
   l_validate_values="true";        # "true" "false"
   l_write_conf="false";            # "false" "true"
-  l_fail_delay="10";               # 60 0..
+  l_fail_delay="10";               # 10 0..
   l_tag_limit="0";                 # defined in parse_args
-  if [ "$(which "wget")" ]; then
+  if in_system "wget"; then
     l_downloader="wget";
-  elif [ "$(which "fetch")" ]; then
+  elif in_system "fetch"; then
     l_downloader="fetch";
   else
     return 1;
   fi;
-  if [ "$(which "sha1sum")" ]; then
+  if in_system "sha1sum"; then
     l_hasher="sha1sum";
-  elif [ "$(which "sha1")" ]; then
+  elif in_system "sha1"; then
     l_hasher="sha1";
   else
     return 2;
   fi;
 # path
-  p_exec_dir="$(
-    scriptpath="$(printf "%s" "$(dirname "$0")" | sed "s|\.\./[^/]*||g;s|^[./]+|/|g;")";
-    firstchar="$(printf "%s" "${scriptpath}" | sed 's/^\(.\).*/\1/g;')";
-    if [ "${firstchar}" = "/" ] && [ "${scriptpath}" != "/" ] && [ -e "${scriptpath}" ]; then
-      printf "%s" "${scriptpath}";
-    elif [ "${firstchar}" = "/" ] && [ "${scriptpath}" != "/" ] && [ ! -e "${scriptpath}" ]; then
-      printf "%s" "${PWD}${scriptpath}";
-    else
-      printf "%s" "${PWD}";
-    fi;
-  )";
+  p_exec_dir="$(dir_realpath "$0")";
   p_danbooru_url="http://danbooru.donmai.us";
   p_storage_dir="${p_exec_dir}/storage";
   p_storage_big_dir="${p_storage_dir}/files";
@@ -124,8 +90,70 @@ init() {
   return 0;
 };
 
+# should test if specified binary name at present in system
+#
+# args: binaryname
+# output: binarypath
+# side effect:
+in_system() {
+(
+  program_name="$1";
+  case "${PATH}" in
+    (*[!:]:) PATH="${PATH}:"; ;;
+  esac;
+  IFS=":";
+  for part_of_path in ${PATH}; do
+    part_of_path="${part_of_path:-"."}";
+    guess_path="${part_of_path}/${program_name}";
+    if [ -f "${guess_path}" ] && [ -x "${guess_path}" ]; then
+      return 0;
+    fi;
+  done;
+  return 1;
+)
+};
 
-
+# should return canonicalised absolute directory pathname
+#
+# args: binaryname
+# output: binarypath
+# side effect:
+dir_realpath() {
+(
+  given_path="$1";
+  realpath="${PWD}";
+  IFS="/";
+  count=0;
+  for part_of_path in ${given_path}; do
+    case "${part_of_path}" in
+      ("")
+        if [ "${count}" -eq 0 ]; then
+          if [ ! -d "${given_path}" ]; then
+            printf "%s" "${given_path%/*}";
+          else
+            printf "%s" "${given_path}";
+          fi;
+          return 0;
+        fi;
+      ;;
+      ("..")
+        realpath="${realpath%/*}";
+      ;;
+      (".") ;;
+      (*)
+        realpath="${realpath}/${part_of_path}";
+      ;;
+    esac;
+    count="$((${count}+1))";
+  done;
+  if [ ! -d "${realpath}" ]; then
+    printf "%s" "${realpath%/*}";
+  else
+    printf "%s" "${realpath}";
+  fi;
+  return 0;
+)
+};
 
 # should return directory name from given path
 #
@@ -135,8 +163,7 @@ init() {
 dirname() {
 (
   path="$1";
-  out="$(printf "%s" "$1" | sed 's|\(.*\)/[^/]*|\1|g;')";
-  printf "%s" "${out}";
+  printf "%s" "${path%/*}";
   return 0;
 )
 };
@@ -150,8 +177,7 @@ urlencode() {
 (
   IFS="";
   read -r input;
-  out="$(printf "%s" "${input}" | od -t x1 -v | sed 's/^[0-9]*//g;s/[[:space:]]\{1,\}/%/g;s/[%]*$//g;' | while read -r line; do printf "%s" "${line}"; done)";
-  printf "%s" "${out}";
+  printf "%s" "${input}" | od -t x1 -v | sed 's/^[0-9]*//g;s/[[:space:]]\{1,\}/%/g;s/[%]*$//g;' | while read -r line; do printf "%s" "${line}"; done;
   return 0;
 )
 };
@@ -164,7 +190,9 @@ urlencode() {
 dateformat() {
 (
   date="$1";
-  out="$(printf "%s" "${date}" | sed 's/^[a-zA-Z]*[[:space:]]*\([a-zA-Z]*\)[[:space:]]*\([0-9]*\)[[:space:]]*\([0-9]*\):\([0-9]*\):\([0-9]*\)[[:space:]]*[0-9+-]*[[:space:]]*\([0-9]*\)/\6\1\2\3\4.\5/g;s/Jan/01/g;s/Feb/02/g;s/Mar/03/g;s/Apr/04/g;s/May/05/g;s/Jun/06/g;s/Jul/07/g;s/Aug/08/g;s/Sep/09/g;s/Oct/10/g;s/Nov/11/g;s/Dec/12/g;')";
+  out="$(printf "%s" "${date}" | sed '
+    s/^[a-zA-Z]*[[:space:]]*\([a-zA-Z]*\)[[:space:]]*\([0-9]*\)[[:space:]]*\([0-9]*\):\([0-9]*\):\([0-9]*\)[[:space:]]*[0-9+-]*[[:space:]]*\([0-9]*\)/\6\1\2\3\4.\5/g;
+    s/Jan/01/g;s/Feb/02/g;s/Mar/03/g;s/Apr/04/g;s/May/05/g;s/Jun/06/g;s/Jul/07/g;s/Aug/08/g;s/Sep/09/g;s/Oct/10/g;s/Nov/11/g;s/Dec/12/g;')";
   printf "%s" "${out}";
   return 0;
 )
@@ -179,14 +207,8 @@ notify() {
 (
   print_level="$1";
   shift;
-  if [ ! "$1" ]; then
-    return 1;
-  fi;
   message="$@";
   verbose_level="${l_verbose_level}";
-  if [ "${print_level}" = "a" ]; then
-    print_level="$((${verbose_level}-1))";
-  fi;
   out=2;
   if [ "${print_level}" -le "${verbose_level}" ]; then
     case "${print_level}" in
@@ -215,10 +237,10 @@ password_hash() {
   salted_pass="$(printf "%s" "${password_salt}" | sed "s/<password>/${password}/g;")";
   case "${l_hasher}" in
     ("sha1")
-      out="$(printf "%s" "${salted_pass}" | sha1 | sed 's/[^a-f0-9]//g;)";
+      out="$(printf "%s" "${salted_pass}" | sha1 | sed 's/[^a-f0-9]//g;')";
     ;;
     ("sha1sum")
-      out="$(printf "%s" "${salted_pass}" | sha1sum | sed 's/[^a-f0-9]//g;)";
+      out="$(printf "%s" "${salted_pass}" | sha1sum | sed 's/[^a-f0-9]//g;')";
     ;;
   esac;
   printf "%s" "${out}";
@@ -259,7 +281,7 @@ parse_args() {
       ("-td"|"--tempdir") p_temp_dir="$2"; [ "$2" ] && { shift; }; ;;
       ("-dm"|"--download-mode") l_download_mode="$2"; [ "$2" ] && { shift; }; ;;
       ("-def"|"--download-export-format") s_export_format="$2"; [ "$2" ] && { shift; }; ;;
-      ("-dpo"|"--download-page-offset") l_download_page_offset="$2"; [ "$2" ] && { shift; }; ;;
+      ("-dpo"|"--download-page-offset") l_download_page_offset="$(printf "%d" "$2" 2>/dev/null)"; [ "$2" ] && { shift; }; ;;
       ("-dps"|"--download-page-size") l_download_page_size="$2"; [ "$2" ] && { shift; }; ;;
       ("-dsd"|"--download-storage-dir") p_storage_dir="$2"; [ "$2" ] && { shift; }; ;;
       ("-dsn"|"--download-samedir") p_storage_big_dir="$2"; [ "$2" ] && { shift; }; ;;
@@ -311,8 +333,8 @@ USAGE: '$0' [OPTIONS] <TAGS>
   -v   --verbosity
                Verbosity level. 
                Default: '${l_verbose_level}'
-               0    no output.
-               1    + errors and rusilts
+               0    search and export results
+               1    + errors
                2    + progress display messages.
                3    + warning messages.
                4    + debug information
@@ -427,7 +449,11 @@ USAGE: '$0' [OPTIONS] <TAGS>
 # side effect: prints help message
 help_atai() {
 (
-  data="659658759531120655977442455993431078871375578775867522085448698961241785898320841875684479974177979228780136958592397761257995933576702158887582133231765767340336755676885982469867634093175555587573486759624075136866683296877866340679813767558979796330697977133477982312097689987961341";
+  data="\
+6596587595311206559774424559934310788713755787758675220854486989612417858983208\
+4187568447997417797922878013695859239776125799593357670215888758213323176576734\
+0336755676885982469867634093175555587573486759624075136866683296877866340679813\
+767558979796330697977133477982312097689987961341";
   notify 0 "$(printf "%s\n" "${data}" | sed "s/[$(printf "%s" "${data}" | sed 's/.*7\([6-8]\)87\(.\).*/\2/g;')-$(printf "%s" "${data}" | sed 's/.*673\(.\).*/\1/g;')]/#/g;s/[$(printf "%s" "${data}" | sed 's/.*\(.\)88875821332317657673403.*/\1/g;')-$(printf "%s" "${data}" | sed 's/.*18756844799741779792287801369585923\(.\).*/\1/g;')]/ /g;s/$(printf "%s" "${data}" | sed 's/.*3431078871375578775867522\(.\)[854]*869896124178589832.*/\1/g;')/\\\\n/g;")\n";
   return 0;
 )
@@ -468,8 +494,8 @@ l_write_conf='false'
 
 # Verbosity level. 
 # Default: '3'
-# 0    no output.
-# 1    + errors and rusilts
+# 0    search and export results
+# 1    + errors
 # 2    + progress display messages.
 # 3    + warning messages.
 # 4    + debug information
@@ -652,10 +678,6 @@ validate_values() {
   if [ "${l_fail_delay}" -lt 0 ]; then
     notify 1 "l_fail_delay (-fd) must not be lesser then 0.\n";
     return 1;
-  fi;
-  if [ "${l_verbose_level}" -lt 0 ] || [ "${l_verbose_level}" -gt 4 ]; then
-    notify 1 "l_verbose_level (-v) must be in range 0..4.\n";
-    return 2;
   fi;
   if [ "${s_auth_password_hash}" ] || [ "${s_auth_login}" ]; then
     if [ ! "${s_auth_password_hash}" ]; then
@@ -1052,7 +1074,7 @@ parser() {
     count="$((${page}*${l_download_page_size}-${l_download_page_size}+1))";
     result="$(query "post" "limit=${l_download_page_size},page=${page},tags=${tag}" "persist" | sed -n '/<post /{p;};')";
     printf "%s\n" "${result}" | while read -r post; do
-      printf -- "$(printf "%s" "${post}" | sed 's/[^"]*"\([^"]*\)"/\1\\n/g;s/\/>//g;s/&/\\&/g;s|/|\\\\/|g;')" | (
+      printf -- "$(printf "%s" "${post}" | sed 's/[^"]*"\([^"]*\)"/\1\\n/g;s/\/>//g;s/&/\\&/g;s|/|\\\\/|g;s/%/%%/g;')" | (
         vars="post_score post_preview_width post_tags post_created_at post_height\
               post_md5 post_file_url post_preview_url post_preview_height\
               post_creator_id post_sample_url post_sample_width post_status\
