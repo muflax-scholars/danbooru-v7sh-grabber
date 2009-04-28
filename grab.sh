@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/ash
 
 # Used binaries:
 # sh cat sed grep od wc mv ln rm [ printf touch sleep cut
@@ -39,7 +39,7 @@
 # output:
 # side effect: defines variables
 init() {
-  g_version="Danbooru v7sh grabber v0.10.3 for Danbooru API v1.13.0";
+  g_version="Danbooru v7sh grabber v0.10.4 for Danbooru API v1.13.0";
 # const
   c_anonymous_tag_limit="2";      # API const
   c_registred_tag_limit="6";      # API const
@@ -56,6 +56,8 @@ init() {
   l_write_conf="false";            # "false" "true"
   l_fail_delay="10";               # 10 0..
   l_tag_limit="0";                 # defined in parse_args
+  l_download_extensions_allow="";  # downloading extensions
+  l_download_extensions_deny="";   # downloading extensions
   if in_system "wget"; then
     l_downloader="wget";
   elif in_system "fetch"; then
@@ -280,6 +282,8 @@ parse_args() {
       ("-v"|"--verbosity") l_verbose_level="$(printf "%d" "$2" 2>/dev/null)"; [ "$2" ] && { shift; } ; ;;
       ("-td"|"--tempdir") p_temp_dir="$2"; [ "$2" ] && { shift; }; ;;
       ("-dm"|"--download-mode") l_download_mode="$2"; [ "$2" ] && { shift; }; ;;
+      ("-dea"|"--download-extensions-allow") l_download_extensions_allow="$2"; [ "$2" ] && { shift; }; ;;
+      ("-ded"|"--download-extensions-deny") l_download_extensions_deny="$2"; [ "$2" ] && { shift; }; ;;
       ("-def"|"--download-export-format") s_export_format="$2"; [ "$2" ] && { shift; }; ;;
       ("-dpo"|"--download-page-offset") l_download_page_offset="$(printf "%d" "$2" 2>/dev/null)"; [ "$2" ] && { shift; }; ;;
       ("-dps"|"--download-page-size") l_download_page_size="$2"; [ "$2" ] && { shift; }; ;;
@@ -325,7 +329,7 @@ USAGE: '$0' [OPTIONS] <TAGS>
 
   -h   --help
                Displays this help message.
-  -c   --config                 <FILEPATH>
+  -c   --config                    <FILEPATH>
                Danbooru grabber configuration file.
                Default: '${p_conf_file}'
   -w   --write-config
@@ -338,7 +342,7 @@ USAGE: '$0' [OPTIONS] <TAGS>
                2    + progress display messages.
                3    + warning messages.
                4    + debug information
-  -td --tempdir                 <DIRPATH>
+  -td --tempdir                    <DIRPATH>
                Directory for temp files.
                Default: '${p_temp_dir}'
   -d   --download
@@ -357,7 +361,15 @@ USAGE: '$0' [OPTIONS] <TAGS>
                                  will be created symlinks in other directories.
                export            do not download, just print links in -def 
                                  specified format.
-  -def --download-export-format <FORMAT>
+  -dea --download-extensions-allow <LIST>
+               If specified, download only specified extensions.
+               Default: '${l_download_extensions_allow}'
+               Group into list using coma (,).
+  -ded --download-extensions-deny  <LIST>
+               If specified, do not download specified extensions.
+               Default: '${l_download_extensions_deny}'
+               Group into list using coma (,).
+  -def --download-export-format    <FORMAT>
                Format of export output.
                Default: '${s_export_format}'
                file:url          file url
@@ -369,21 +381,21 @@ USAGE: '$0' [OPTIONS] <TAGS>
                file:id           file id
                file:parent_id    file parent id
                file:source       file source url
-  -dpo --download-page-offset   <1..>
+  -dpo --download-page-offset      <1..>
                From which page begin grabbing.
                Default: '${l_download_page_offset}'
-  -dps --download-page-size     <1..100>
+  -dps --download-page-size        <1..100>
                Amount of images per page. According to danbooru API v1.13.0 must
                be in 1.100 range, but in fact, with -n option, can be over 1000.
                Default: '${l_download_page_size}'
-  -dsd --download-storage-dir   <DIRPATH>
+  -dsd --download-storage-dir      <DIRPATH>
                Directory to which all images will be saved.
                Default: '${p_storage_dir}'
-  -dsn --download-samedir       <DIRPATH>
+  -dsn --download-samedir          <DIRPATH>
                Directory to which images will be saved if samedir download-type 
                specified.
                Default: '${p_storage_big_dir}'
-  -dfn --download-file-name     <FORMAT>
+  -dfn --download-file-name        <FORMAT>
                Filename scheme to which file will be renamed. 
                Default: '${s_rename_string}'
                file:count   file number
@@ -396,12 +408,12 @@ USAGE: '$0' [OPTIONS] <TAGS>
                automaticly adding extension.
   -s   --search
                Search in tags.
-  -sm --search-mode             <simple|deep>
+  -sm --search-mode                <simple|deep>
                Search mechanism type.
                Default: '${l_search_mode}'
                simple      Gets a little outdated number of images, but faster.
                deep        Gets actual number of images, but slower.
-  -so  --search-order           <name|count|date>
+  -so  --search-order              <name|count|date>
                Search sort order.
                date
                count
@@ -409,18 +421,18 @@ USAGE: '$0' [OPTIONS] <TAGS>
                Default: '${l_search_order}'
   -sr  --searh-reverse
                Reverse search order.
-  -u   --username               <USERNAME>
+  -u   --username                  <USERNAME>
                Danbooru account username.
-  -p   --password               <PASSWORD>
+  -p   --password                  <PASSWORD>
                Danbooru account password.
-  -ps  --password-salt          <PASSWORD SALT>
+  -ps  --password-salt             <PASSWORD SALT>
                Actual password salt. '<password>' will be replaced with actual
                password.
                Default: '${s_auth_password_salt}'
-  -url --url                    <URL>
+  -url --url                       <URL>
                Danbooru URL.
                Default: '${p_danbooru_url}'
-  -fd  --fail-delay             <0..>
+  -fd  --fail-delay                <0..>
                Delay in seconds to wait on query fail before try again.
                Default: '${l_fail_delay}'
   -n   --no-checks
@@ -565,6 +577,16 @@ p_storage_dir='${p_storage_dir}'
 # Directory to which images will be saved if samedir download_type specified.
 # Default: '${p_storage_big_dir}'
 p_storage_big_dir='${p_storage_big_dir}'
+
+# If defined, download only specified extenstions
+# Default: ''
+# Group intlo list using coma.
+#l_download_extensions_allow='jpg,gif,png'
+
+# If defined, do not download specified extenstions
+# Default: ''
+# Group intlo list using coma.
+#l_download_extensions_deny='tiff,psd,xcf,bmp'
 
 # Search mechanism type.
 # Default: 'simple'
@@ -769,6 +791,7 @@ validate_values() {
   for tag in ${s_tags}; do
     tagcount="$(printf "%s" "${tag}" | wc -w)";
     if [ "${tagcount}" -gt "${l_tag_limit}" ]; then
+      tag="$(printf "%s" "${tag}" | sed 's/^[[:space:]]*//g;s/[[:space:]]*$//g;')";
       if [ "${s_auth_string}" ]; then
         notify 1 "number of intersecting tags ('${tag}') can't be more then ${c_registred_tag_limit} for registred user.\n";
       else
@@ -1087,6 +1110,28 @@ parser() {
         post_tags="$(printf "%s" "${post_tags}" | sed 's,[/],,g;s/&/\\&/g;s/[[:space:]]\{1,\}/-/g;')";
         safe_tag="$(printf "%s" "${tag}" | sed 's,[/],,g;s/&/\\&/g;s/[[:space:]]\{1,\}/-/g;')";
         post_file_ext="$(printf "%s" "${post_file_url}" | sed 's/.*\.//g')";
+        this_is_allowed="true";
+        IFS=",";
+        if [ "${l_download_extensions_allow}" ]; then
+          this_is_allowed="false";
+          for ext_rule in ${l_download_extensions_allow}; do
+            ext_rule="$(printf "%s" "${ext_rule}" | sed 's/^[[:space:]]*//g;s/[[:space:]]*$//g;')";
+            if [ "${ext_rule}" = "${post_file_ext}" ]; then
+              this_is_allowed="true";
+            fi;
+          done;
+        fi;
+        if [ "${l_download_extensions_deny}" ]; then
+          for ext_rule in ${l_download_extensions_deny}; do
+            ext_rule="$(printf "%s" "${ext_rule}" | sed 's/^[[:space:]]*//g;s/[[:space:]]*$//g;')";
+            if [ "${ext_rule}" = "${post_file_ext}" ]; then
+              this_is_allowed="false";
+            fi;
+          done;
+        fi;
+        if [ "${this_is_allowed}" = "false" ]; then
+          continue;
+        fi;
         case "${l_download_mode}" in
           ("export") export_out; ;;
           (*) download; ;;
