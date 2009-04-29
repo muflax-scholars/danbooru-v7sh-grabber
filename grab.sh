@@ -1,4 +1,4 @@
-#!/bin/ash
+#!/bin/sh
 
 # Used binaries:
 # sh cat sed grep od wc mv ln rm [ printf touch sleep cut
@@ -44,6 +44,7 @@ init() {
   c_anonymous_tag_limit="2";      # API const
   c_registred_tag_limit="6";      # API const
 # logic
+  l_engine="danbooru";             # "danbooru"
   l_mode="search";                 # "search" "download"
   l_search_mode="simple"           # "simple" "deep"
   l_search_order="count";          # "count" "name" "date"
@@ -804,46 +805,6 @@ validate_values() {
 )
 };
 
-# should process api queries, logging in and urlencoding
-#
-# args: type params ispersist
-# output: query_reply
-# side effect:
-query() {
-(
-  type="$1";
-  params="$2";
-  persist="$3";
-  case "${type}" in
-    ("tag") url="${p_danbooru_url}/tag/index.xml?"; ;;
-    ("post") url="${p_danbooru_url}/post/index.xml?"; ;;
-  esac;
-  temp_file="${p_temp_dir}/$$-danbooru_grabber_query_result";
-  IFS=",";
-  for param in ${params}; do
-    IFS=" ";
-    arg="$(printf "%s" "${param}" | sed 's/=.*//g;')";
-    case "${arg}" in
-      ("tags"|"name")
-        for tag in $(printf "%s" "${param}" | sed 's/^[^=]*=//g'); do
-          out="${out}+$(printf "%s" "${tag}" | urlencode)";
-        done;
-        value="$(printf "%s" "${out}" | sed 's/^+//g;')";
-      ;;
-      (*)
-        value="$(printf "%s" "${param}" | sed 's/^[^=]*=//g;' | urlencode)";
-      ;;
-    esac;
-    url="${url}${arg}=${value}&";
-  done;
-  url="$(printf "%s" "${url}" | sed 's/&$//g;')";
-  url="${url}${s_auth_string}";
-  get_file ${persist} "${url}" "${temp_file}";
-  cat "${temp_file}";
-  rm -f "${temp_file}";
-)
-};
-
 # should just try to download files
 #
 # args: url local_path
@@ -920,63 +881,6 @@ get_file() {
       return 2;
     fi;
     break;
-  done;
-  return 0;
-)
-};
-
-# should get actual count of specified tag
-#
-# args: ispersist tag
-# output: count
-# side effect:
-get_count() {
-(
-  if [ "$1" = "persist" ]; then
-    persist="$1";
-    shift;
-  fi;
-  tag="$1";
-  tagcount="$(($(printf "%s" "${tag}" | grep -c " ")+1))";
-  if [ "${tagcount}" -lt "${l_tag_limit}" ]; then
-    tag="${tag} status:active";
-  fi;
-  result="$(query "post" "limit=1,page=1,tags=${tag}" ${persist} | sed -n '/<posts/{s/.*count="\([0-9]*\)".*/\1/p;};')";
-  printf "%d" "${result}";
-  return 0;
-)
-};
-
-# should search in tags by given wildcard
-#
-# args: wildcard
-# output:
-# side effect: print search results
-search() {
-(
-  tag="$1";
-  result="$(query "tag" "order=${l_search_order},name=${tag}")" || { return 1; };
-  if [ "$(printf "%s" "${tag}" | wc -w)" -ge 2 ]; then
-    result="0 mixed ${tag}";
-    l_search_mode="deep";
-  else
-    result="$(printf "%s\n" "${result}" | sed -n '/<tag /{s/type="0"/type="general"/g;s/type="1"/type="artist"/g;s/type="3"/type="title"/g;s/type="4"/type="character"/g;s/.*type="\([^"]*\)" count="\([0-9]*\)".*name="\([^"]*\)".*/\2 \1 \3/g;p;};')";
-    if [ "${l_search_result_reverse_order}" = "true" ]; then
-      result="$(printf "%s\n" "${result}" | tac )";
-    fi;
-  fi;
-  IFS=" ";
-  printf "%s\n" "${result}" | while read -r line; do
-    case "${l_search_mode}" in
-      ("simple")
-        notify 0 "$(printf "%#10s %#9s %s" ${line})\n";
-      ;;
-      ("deep")
-        type="$(printf "%s" "${line}" | cut -d' ' -f2)";
-        tag="$(printf "%s" "${line}" | cut -d' ' -f3-)";
-        notify 0 "$(printf "%#10d %#9s ${tag}\n" "$(get_count "${tag}")" "${type}")\n";
-      ;;
-    esac;
   done;
   return 0;
 )
@@ -1073,77 +977,181 @@ export_out() {
 )
 };
 
-# should parse api data replise
+# should initialize functions for danbooru parsing
 #
-# args: tag
+# args:
 # output:
-# side effect: do all the stuff
-parser() {
-(
-  tag="$1";
-  notify 2 "Begining downloading for tag '${tag}'.\n";
-  total_count="$(get_count "persist" "${tag}")";
-  if [ "${total_count}" -eq 0 ]; then
-    notify 1 "there is no tag '${tag}'.\n";
-    return 1;
-  fi;
-  total_pages="$((${total_count}/${l_download_page_size}))";
-  if [ "$((${total_count}%${l_download_page_size}))" -gt 0 ]; then
-    total_pages="$((${total_pages}+1))";
-  fi;
-  page="${l_download_page_offset}";
-  while [ "${page}" -le "${total_pages}" ]; do
-    notify 2 "  Switching to page ${page} of ${total_pages}.\n";
-    count="$((${page}*${l_download_page_size}-${l_download_page_size}+1))";
-    result="$(query "post" "limit=${l_download_page_size},page=${page},tags=${tag}" "persist" | sed -n '/<post /{p;};')";
-    printf "%s\n" "${result}" | while read -r post; do
-      printf -- "$(printf "%s" "${post}" | sed 's/[^"]*"\([^"]*\)"/\1\\n/g;s/\/>//g;s/&/\\&/g;s|/|\\\\/|g;s/%/%%/g;')" | (
-        vars="post_score post_preview_width post_tags post_created_at post_height\
-              post_md5 post_file_url post_preview_url post_preview_height\
-              post_creator_id post_sample_url post_sample_width post_status\
-              post_sample_height post_rating post_hash_children post_parent_id\
-              post_id post_change post_source post_width";
-        IFS=" ";
-        for var in $vars; do
-          read -r "$var";
-        done;
-        post_tags="$(printf "%s" "${post_tags}" | sed 's,[/],,g;s/&/\\&/g;s/[[:space:]]\{1,\}/-/g;')";
-        safe_tag="$(printf "%s" "${tag}" | sed 's,[/],,g;s/&/\\&/g;s/[[:space:]]\{1,\}/-/g;')";
-        post_file_ext="$(printf "%s" "${post_file_url}" | sed 's/.*\.//g')";
-        this_is_allowed="true";
-        IFS=",";
-        if [ "${l_download_extensions_allow}" ]; then
-          this_is_allowed="false";
-          for ext_rule in ${l_download_extensions_allow}; do
-            ext_rule="$(printf "%s" "${ext_rule}" | sed 's/^[[:space:]]*//g;s/[[:space:]]*$//g;')";
-            if [ "${ext_rule}" = "${post_file_ext}" ]; then
-              this_is_allowed="true";
-            fi;
+# side effect: defines funcionts
+init_danbooru() {
+  # should process api queries, logging in and urlencoding
+  #
+  # args: type params ispersist
+  # output: query_reply
+  # side effect:
+  query() {
+  (
+    type="$1";
+    params="$2";
+    persist="$3";
+    case "${type}" in
+      ("tag") url="${p_danbooru_url}/tag/index.xml?"; ;;
+      ("post") url="${p_danbooru_url}/post/index.xml?"; ;;
+    esac;
+    temp_file="${p_temp_dir}/$$-danbooru_grabber_query_result";
+    IFS=",";
+    for param in ${params}; do
+      IFS=" ";
+      arg="$(printf "%s" "${param}" | sed 's/=.*//g;')";
+      case "${arg}" in
+        ("tags"|"name")
+          for tag in $(printf "%s" "${param}" | sed 's/^[^=]*=//g'); do
+            out="${out}+$(printf "%s" "${tag}" | urlencode)";
           done;
-        fi;
-        if [ "${l_download_extensions_deny}" ]; then
-          for ext_rule in ${l_download_extensions_deny}; do
-            ext_rule="$(printf "%s" "${ext_rule}" | sed 's/^[[:space:]]*//g;s/[[:space:]]*$//g;')";
-            if [ "${ext_rule}" = "${post_file_ext}" ]; then
-              this_is_allowed="false";
-            fi;
-          done;
-        fi;
-        if [ "${this_is_allowed}" = "false" ]; then
-          continue;
-        fi;
-        case "${l_download_mode}" in
-          ("export") export_out; ;;
-          (*) download; ;;
-        esac;
-      );
-      count="$((${count}+1))";
+          value="$(printf "%s" "${out}" | sed 's/^+//g;')";
+        ;;
+        (*)
+          value="$(printf "%s" "${param}" | sed 's/^[^=]*=//g;' | urlencode)";
+        ;;
+      esac;
+      url="${url}${arg}=${value}&";
     done;
-    page="$((${page}+1))";
-  done;
-  notify 2 "Downloading for tag '${tag}' has been finished.\n";
-  return 0;
-)
+    url="$(printf "%s" "${url}" | sed 's/&$//g;')";
+    url="${url}${s_auth_string}";
+    get_file ${persist} "${url}" "${temp_file}";
+    cat "${temp_file}";
+    rm -f "${temp_file}";
+  )
+  };
+
+  # should get actual count of specified tag
+  #
+  # args: ispersist tag
+  # output: count
+  # side effect:
+  get_count() {
+  (
+    if [ "$1" = "persist" ]; then
+      persist="$1";
+      shift;
+    fi;
+    tag="$1";
+    tagcount="$(($(printf "%s" "${tag}" | grep -c " ")+1))";
+    if [ "${tagcount}" -lt "${l_tag_limit}" ]; then
+      tag="${tag} status:active";
+    fi;
+    result="$(query "post" "limit=1,page=1,tags=${tag}" ${persist} | sed -n '/<posts/{s/.*count="\([0-9]*\)".*/\1/p;};')";
+    printf "%d" "${result}";
+    return 0;
+  )
+  };
+
+  # should search in tags by given wildcard
+  #
+  # args: wildcard
+  # output:
+  # side effect: print search results
+  search() {
+  (
+    tag="$1";
+    result="$(query "tag" "order=${l_search_order},name=${tag}")" || { return 1; };
+    if [ "$(printf "%s" "${tag}" | wc -w)" -ge 2 ]; then
+      result="0 mixed ${tag}";
+      l_search_mode="deep";
+    else
+      result="$(printf "%s\n" "${result}" | sed -n '/<tag /{s/type="0"/type="general"/g;s/type="1"/type="artist"/g;s/type="3"/type="title"/g;s/type="4"/type="character"/g;s/.*type="\([^"]*\)" count="\([0-9]*\)".*name="\([^"]*\)".*/\2 \1 \3/g;p;};')";
+      if [ "${l_search_result_reverse_order}" = "true" ]; then
+        result="$(printf "%s\n" "${result}" | tac )";
+      fi;
+    fi;
+    IFS=" ";
+    printf "%s\n" "${result}" | while read -r line; do
+      case "${l_search_mode}" in
+        ("simple")
+          notify 0 "$(printf "%#10s %#9s %s" ${line})\n";
+        ;;
+        ("deep")
+          type="$(printf "%s" "${line}" | cut -d' ' -f2)";
+          tag="$(printf "%s" "${line}" | cut -d' ' -f3-)";
+          notify 0 "$(printf "%#10d %#9s ${tag}\n" "$(get_count "${tag}")" "${type}")\n";
+        ;;
+      esac;
+    done;
+    return 0;
+  )
+  };
+
+  # should parse api data replise
+  #
+  # args: tag
+  # output:
+  # side effect: do all the stuff
+  parser() {
+  (
+    tag="$1";
+    notify 2 "Begining downloading for tag '${tag}'.\n";
+    total_count="$(get_count "persist" "${tag}")";
+    if [ "${total_count}" -eq 0 ]; then
+      notify 1 "there is no tag '${tag}'.\n";
+      return 1;
+    fi;
+    total_pages="$((${total_count}/${l_download_page_size}))";
+    if [ "$((${total_count}%${l_download_page_size}))" -gt 0 ]; then
+      total_pages="$((${total_pages}+1))";
+    fi;
+    page="${l_download_page_offset}";
+    while [ "${page}" -le "${total_pages}" ]; do
+      notify 2 "  Switching to page ${page} of ${total_pages}.\n";
+      count="$((${page}*${l_download_page_size}-${l_download_page_size}+1))";
+      result="$(query "post" "limit=${l_download_page_size},page=${page},tags=${tag}" "persist" | sed -n '/<post /{p;};')";
+      printf "%s\n" "${result}" | while read -r post; do
+        printf -- "$(printf "%s" "${post}" | sed 's/[^"]*"\([^"]*\)"/\1\\n/g;s/\/>//g;s/&/\\&/g;s|/|\\\\/|g;s/%/%%/g;')" | (
+          vars="post_score post_preview_width post_tags post_created_at post_height\
+                post_md5 post_file_url post_preview_url post_preview_height\
+                post_creator_id post_sample_url post_sample_width post_status\
+                post_sample_height post_rating post_hash_children post_parent_id\
+                post_id post_change post_source post_width";
+          IFS=" ";
+          for var in $vars; do
+            read -r "$var";
+          done;
+          post_tags="$(printf "%s" "${post_tags}" | sed 's,[/],,g;s/&/\\&/g;s/[[:space:]]\{1,\}/-/g;')";
+          safe_tag="$(printf "%s" "${tag}" | sed 's,[/],,g;s/&/\\&/g;s/[[:space:]]\{1,\}/-/g;')";
+          post_file_ext="$(printf "%s" "${post_file_url}" | sed 's/.*\.//g')";
+          this_is_allowed="true";
+          IFS=",";
+          if [ "${l_download_extensions_allow}" ]; then
+            this_is_allowed="false";
+            for ext_rule in ${l_download_extensions_allow}; do
+              ext_rule="$(printf "%s" "${ext_rule}" | sed 's/^[[:space:]]*//g;s/[[:space:]]*$//g;')";
+              if [ "${ext_rule}" = "${post_file_ext}" ]; then
+                this_is_allowed="true";
+              fi;
+            done;
+          fi;
+          if [ "${l_download_extensions_deny}" ]; then
+            for ext_rule in ${l_download_extensions_deny}; do
+              ext_rule="$(printf "%s" "${ext_rule}" | sed 's/^[[:space:]]*//g;s/[[:space:]]*$//g;')";
+              if [ "${ext_rule}" = "${post_file_ext}" ]; then
+                this_is_allowed="false";
+              fi;
+            done;
+          fi;
+          if [ "${this_is_allowed}" = "false" ]; then
+            continue;
+          fi;
+          case "${l_download_mode}" in
+            ("export") export_out; ;;
+            (*) download; ;;
+          esac;
+        );
+        count="$((${count}+1))";
+      done;
+      page="$((${page}+1))";
+    done;
+    notify 2 "Downloading for tag '${tag}' has been finished.\n";
+    return 0;
+  )
+  };
 };
 
 # should do everything that this grabber should
@@ -1159,13 +1167,16 @@ main() {
   parse_args "get_conf" "$@";
   read_conf;
   parse_args "all" "$@";
-(
   case "$?" in
     (0) ;;
     (1) help; return 0; ;;
     (2) help_atai; return 0; ;;
     (*) return "2$?";
   esac;
+  case "${l_engine}" in
+    ("danbooru") init_danbooru; ;;
+  esac;
+(
   if [ "${l_validate_values}" = "true" ]; then
     validate_values || { return "3$?"; };
   fi;
