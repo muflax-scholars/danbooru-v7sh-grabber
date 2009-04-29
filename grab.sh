@@ -39,7 +39,7 @@
 # output:
 # side effect: defines variables
 init() {
-  g_version="Danbooru v7sh grabber v0.10.5 for Danbooru API v1.13.0";
+  g_version="Danbooru v7sh grabber v0.10.6 for Danbooru API v1.13.0";
 # const
   c_anonymous_tag_limit="2";      # API const
   c_registred_tag_limit="6";      # API const
@@ -1063,7 +1063,7 @@ init_danbooru() {
   (
     tag="$1";
     result="$(query "tag" "order=${l_search_order},name=${tag}")" || { return 1; };
-    if [ "$(printf "%s" "${tag}" | wc -w)" -ge 2 ]; then
+    if [ "$(printf "%s" "${tag}" | wc -w)" -ge 2 ] || printf "%s" "${result}" | grep -q '<tags type="array"/>'; then
       result="0 mixed ${tag}";
       l_search_mode="deep";
     else
