@@ -2,7 +2,7 @@
 
 # Used binaries:
 # sh cat sed grep od wc mv ln rm [ printf touch sleep cut
-# wget/fetch
+# wget/fetch/curl
 # sha1/sha1sum
 
 # main script scheme
