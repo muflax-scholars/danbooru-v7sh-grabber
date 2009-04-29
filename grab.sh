@@ -63,6 +63,8 @@ init() {
     l_downloader="wget";
   elif in_system "fetch"; then
     l_downloader="fetch";
+  elif in_system "curl"; then
+    l_downloader="curl";
   else
     return 1;
   fi;
@@ -816,7 +818,7 @@ downloader() {
   local_filepath="$2";
   case "${l_downloader}" in
     ("wget")
-      result="$(wget -c -O "${local_filepath}" "${url}" 2>&1)" || {
+      result="$(LANG=C wget -c -O "${local_filepath}" "${url}" 2>&1)" || {
         if printf "%s" "${result}" | grep -q "ERROR [0-9]*"; then
           printf "%s" "${result}" | sed -n "/ERROR/{s/.*ERROR //g;p;};";
           return 1;
@@ -827,12 +829,19 @@ downloader() {
       };
     ;;
     ("fetch")
-      result="$(fetch -m -o "${local_filepath}" "${url}" 2>&1)" || {
+      result="$(LANG=C fetch -m -o "${local_filepath}" "${url}" 2>&1)" || {
         if printf "%s" "${result}" | grep -q "fetch: http://[^:]*: [A-Z]"; then
           printf "%s" "${result}" | sed -n "s/.*://g;p;";
           return 1;
         fi;
         if printf "%s" "${result}" | grep -q "No address record"; then
+          return 2;
+        fi;
+      };
+    ;;
+    ("curl")
+      LANG=C curl "${url}" -s -C - -o "${local_filepath}" || {
+        if [ "$?" -eq 6 ]; then
           return 2;
         fi;
       };
