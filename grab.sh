@@ -5,7 +5,7 @@
 # wget/fetch/curl
 # sha1/sha1sum
 
-# main script scheme 
+# main script scheme UPD LOL
 # 
 #             init
 #               V
