@@ -39,7 +39,7 @@
 # output:
 # side effect: defines variables
 init() {
-  g_version="Danbooru v7sh grabber v0.10.7 for Danbooru API v1.13.0";
+  g_version="Danbooru v7sh grabber v0.10.8 for Danbooru API v1.13.0";
 # const
   c_anonymous_tag_limit="2";      # API const
   c_registred_tag_limit="6";      # API const
@@ -907,7 +907,7 @@ download() {
     s/file:id/${post_id}/g;
     s/file:height/${post_height}/g;
     s/file:width/${post_width}/g;
-    s/file:tags/${post_tags}/g;
+    s/file:tags/${safe_tags}/g;
     s/file:md5/${post_md5}/g;
     s/[[:space:]]*&[#0-9a-zA-Z]*[[:space:]]*;//g;
     s/^\(.\{0,$((254-${#post_file_ext}))\}\).*/\1/g;
@@ -933,21 +933,19 @@ download() {
       touch -acm -t "$(dateformat "${post_created_at}")" "${file_path}";
     ;;
     ("samedir")
-      if [ ! -d "${p_storage_dir}/${safe_tag}" ]; then
-        mkdir "${p_storage_dir}/${safe_tag}";
-      fi;
       mv "${tmpfile}" "${file_path}";
       touch -acm -t "$(dateformat "${post_created_at}")" "${file_path}";
     ;;
     ("onedir:symlinks"|"samedir:symlinks")
-      if [ ! -d "${p_storage_dir}/${safe_tag}" ]; then
+      if [ ! -d "${p_storage_dir}/${safe_tag}" ] && [ "${l_download_mode}" = "onedir:symlinks" ]; then
         mkdir "${p_storage_dir}/${safe_tag}";
       fi;
       mv "${tmpfile}" "${file_path}";
       touch -acm -t "$(dateformat "${post_created_at}")" "${file_path}";
-      IFS="-";
+      IFS=" ";
       for i_tag in ${post_tags}; do
-        if [ "${i_tag}" = "${safe_tag}" ]; then
+        i_tag="$(printf "%s" "${i_tag}" | sed 's,[/],,g;s/[[:space:]]\{1,\}/-/g;')";
+        if [ "${i_tag}" = "${safe_tag}" ] && [ "${l_download_mode}" = "onedir:symlinks" ]; then
           continue;
         fi;
         if [ ! -d "${p_storage_dir}/${i_tag}" ]; then
@@ -974,7 +972,7 @@ export_out() {
     s/file:url/${post_file_url}/g;
     s/file:preview_url/${post_preview_url}/g;
     s/file:sample_url/${post_sample_url}/g;
-    s/file:tags/${post_tags}/g;
+    s/file:tags/${safe_tags}/g;
     s/file:md5/${post_md5}/g;
     s/file:count/$(printf "%0${#total_count}d" "${count}")/g;
     s/file:id/${post_id}/g;
@@ -1027,7 +1025,7 @@ init_danbooru() {
     url="$(printf "%s" "${url}" | sed 's/&$//g;')";
     url="${url}${s_auth_string}";
     get_file ${persist} "${url}" "${temp_file}";
-    cat "${temp_file}";
+    cat "${temp_file}" | sed 's/&amp;/\&/g;';
     rm -f "${temp_file}";
   )
   };
@@ -1113,46 +1111,46 @@ init_danbooru() {
       count="$((${page}*${l_download_page_size}-${l_download_page_size}+1))";
       result="$(query "post" "limit=${l_download_page_size},page=${page},tags=${tag}" "persist" | sed -n '/<post /{p;};')";
       printf "%s\n" "${result}" | while read -r post; do
-        printf -- "$(printf "%s" "${post}" | sed 's|\\|\\\\|g;s|/|\\\\/|g;s/[^"]*"\([^"]*\)"/\1\\n/g;s/\/>//g;s/&/\\&/g;s/%/%%/g;')" | (
-          vars="post_score post_preview_width post_tags post_created_at post_height\
-                post_md5 post_file_url post_preview_url post_preview_height\
-                post_creator_id post_sample_url post_sample_width post_status\
-                post_sample_height post_rating post_hash_children post_parent_id\
-                post_id post_change post_source post_width";
-          IFS=" ";
-          for var in $vars; do
-            read -r "$var";
+        post_tags="$(printf "%s" ${post} | sed 's/.*tags="\([^"]*\)".*/\1/g;')";
+        post_created_at="$(printf "%s" ${post} | sed 's/.*created_at="\([^"]*\)".*/\1/g;')";
+        post_height="$(printf "%s" ${post} | sed 's/.*height="\([^"]*\)".*/\1/g;')";
+        post_md5="$(printf "%s" ${post} | sed 's/.*md5="\([^"]*\)".*/\1/g;')";
+        post_file_url="$(printf "%s" ${post} | sed 's/.*file_url="\([^"]*\)".*/\1/g;')";
+        post_preview_url="$(printf "%s" ${post} | sed 's/.*preview_url="\([^"]*\)".*/\1/g;')";
+        post_sample_url="$(printf "%s" ${post} | sed 's/.*sample_url="\([^"]*\)".*/\1/g;')";
+        post_parent_id="$(printf "%s" ${post} | sed 's/.*parent_id="\([^"]*\)".*/\1/g;')";
+        post_id="$(printf "%s" ${post} | sed 's/.*id="\([^"]*\)".*/\1/g;')";
+        post_source="$(printf "%s" ${post} | sed 's/.*source="\([^"]*\)".*/\1/g;')";
+        post_width="$(printf "%s" ${post} | sed 's/.*width="\([^"]*\)".*/\1/g;')";
+        safe_tag="$(printf "%s" "${tag}" | sed 's,[/],,g;s/[[:space:]]\{1,\}/-/g;')";
+        safe_tags="$(printf "%s" ${post_tags} | sed 's,[/],,g;s/[[:space:]]\{1,\}/-/g;s/&/\\&/g;')";
+        post_file_ext="$(printf "%s" "${post_file_url}" | sed 's/.*\.//g')";
+        this_is_allowed="true";
+        IFS=",";
+        if [ "${l_download_extensions_allow}" ]; then
+          this_is_allowed="false";
+          for ext_rule in ${l_download_extensions_allow}; do
+            ext_rule="$(printf "%s" "${ext_rule}" | sed 's/^[[:space:]]*//g;s/[[:space:]]*$//g;')";
+            if [ "${ext_rule}" = "${post_file_ext}" ]; then
+              this_is_allowed="true";
+            fi;
           done;
-          post_tags="$(printf "%s" "${post_tags}" | sed 's,[/],,g;s/&/\\&/g;s/[[:space:]]\{1,\}/-/g;')";
-          safe_tag="$(printf "%s" "${tag}" | sed 's,[/],,g;s/&/\\&/g;s/[[:space:]]\{1,\}/-/g;')";
-          post_file_ext="$(printf "%s" "${post_file_url}" | sed 's/.*\.//g')";
-          this_is_allowed="true";
-          IFS=",";
-          if [ "${l_download_extensions_allow}" ]; then
-            this_is_allowed="false";
-            for ext_rule in ${l_download_extensions_allow}; do
-              ext_rule="$(printf "%s" "${ext_rule}" | sed 's/^[[:space:]]*//g;s/[[:space:]]*$//g;')";
-              if [ "${ext_rule}" = "${post_file_ext}" ]; then
-                this_is_allowed="true";
-              fi;
-            done;
-          fi;
-          if [ "${l_download_extensions_deny}" ]; then
-            for ext_rule in ${l_download_extensions_deny}; do
-              ext_rule="$(printf "%s" "${ext_rule}" | sed 's/^[[:space:]]*//g;s/[[:space:]]*$//g;')";
-              if [ "${ext_rule}" = "${post_file_ext}" ]; then
-                this_is_allowed="false";
-              fi;
-            done;
-          fi;
-          if [ "${this_is_allowed}" = "false" ]; then
-            continue;
-          fi;
-          case "${l_download_mode}" in
-            ("export") export_out; ;;
-            (*) download; ;;
-          esac;
-        );
+        fi;
+        if [ "${l_download_extensions_deny}" ]; then
+          for ext_rule in ${l_download_extensions_deny}; do
+            ext_rule="$(printf "%s" "${ext_rule}" | sed 's/^[[:space:]]*//g;s/[[:space:]]*$//g;')";
+            if [ "${ext_rule}" = "${post_file_ext}" ]; then
+              this_is_allowed="false";
+            fi;
+          done;
+        fi;
+        if [ "${this_is_allowed}" = "false" ]; then
+          continue;
+        fi;
+        case "${l_download_mode}" in
+          ("export") export_out; ;;
+          (*) download; ;;
+        esac;
         count="$((${count}+1))";
       done;
       page="$((${page}+1))";
@@ -1209,4 +1207,13 @@ main "$@";
 exitcode="$?";
 rm -f "${p_temp_dir}/$$-danbooru_grabber_query_result";
 rm -f "${p_temp_dir}/$$-danbooru_grabber_temp_content_file";
+set +f;
+IFS="";
+for tempfile in ${p_temp_dir}/*; do
+  if [ "${tempfile}" = "${p_temp_dir}/*" ]; then
+    continue;
+  fi;
+  pid="$(printf "%s" "${tempfile}" | sed 's/-.*//g;s|.*/||g;')";
+  ps -p "${pid}" 1>/dev/null || { rm ${tempfile}; };
+done;
 exit "${exitcode}";
