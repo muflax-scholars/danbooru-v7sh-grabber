@@ -2,10 +2,10 @@
 
 # Used binaries:
 # sh cat sed grep od wc mv ln rm [ printf touch sleep cut
-# wget/fetch/curl
+# wget/fetch
 # sha1/sha1sum
 
-# main script scheme UPD LOL
+# main script scheme
 # 
 #             init
 #               V
@@ -39,7 +39,7 @@
 # output:
 # side effect: defines variables
 init() {
-  g_version="Danbooru v7sh grabber v0.10.6 for Danbooru API v1.13.0";
+  g_version="Danbooru v7sh grabber v0.10.7 for Danbooru API v1.13.0";
 # const
   c_anonymous_tag_limit="2";      # API const
   c_registred_tag_limit="6";      # API const
@@ -48,7 +48,7 @@ init() {
   l_mode="search";                 # "search" "download"
   l_search_mode="simple"           # "simple" "deep"
   l_search_order="count";          # "count" "name" "date"
-  l_search_reverse_order="false";  # "false" "true"
+  l_search_reverse_orderl_search_reverse_order="false";  # "false" "true"
   l_download_mode="onedir";        # "onedir" "onedir:symlinks" "samedir" "samedir:symlinks"
   l_download_page_size="100";      # 100 1..100..*
   l_download_page_offset="1";      # 1 1..
@@ -1068,7 +1068,7 @@ init_danbooru() {
       l_search_mode="deep";
     else
       result="$(printf "%s\n" "${result}" | sed -n '/<tag /{s/type="0"/type="general"/g;s/type="1"/type="artist"/g;s/type="3"/type="title"/g;s/type="4"/type="character"/g;s/.*type="\([^"]*\)" count="\([0-9]*\)".*name="\([^"]*\)".*/\2 \1 \3/g;p;};')";
-      if [ "${l_search_result_reverse_order}" = "true" ]; then
+      if [ "${l_search_reverse_order}" = "true" ]; then
         result="$(printf "%s\n" "${result}" | tac )";
       fi;
     fi;
@@ -1113,7 +1113,7 @@ init_danbooru() {
       count="$((${page}*${l_download_page_size}-${l_download_page_size}+1))";
       result="$(query "post" "limit=${l_download_page_size},page=${page},tags=${tag}" "persist" | sed -n '/<post /{p;};')";
       printf "%s\n" "${result}" | while read -r post; do
-        printf -- "$(printf "%s" "${post}" | sed 's/[^"]*"\([^"]*\)"/\1\\n/g;s/\/>//g;s/&/\\&/g;s|/|\\\\/|g;s/%/%%/g;')" | (
+        printf -- "$(printf "%s" "${post}" | sed 's|\\|\\\\|g;s|/|\\\\/|g;s/[^"]*"\([^"]*\)"/\1\\n/g;s/\/>//g;s/&/\\&/g;s/%/%%/g;')" | (
           vars="post_score post_preview_width post_tags post_created_at post_height\
                 post_md5 post_file_url post_preview_url post_preview_height\
                 post_creator_id post_sample_url post_sample_width post_status\
@@ -1204,5 +1204,9 @@ main() {
 )
 };
 
-# main grabber code. yes, it is actualy one-liner.
-main "$@"; exit "$?";
+# main grabber code.
+main "$@";
+exitcode="$?";
+rm -f "${p_temp_dir}/$$-danbooru_grabber_query_result";
+rm -f "${p_temp_dir}/$$-danbooru_grabber_temp_content_file";
+exit "${exitcode}";
