@@ -39,7 +39,7 @@
 # output:
 # side effect: defines variables
 init() {
-  g_version="Danbooru v7sh grabber v0.10.8 for Danbooru API v1.13.0";
+  g_version="Danbooru v7sh grabber v0.10.9 for Danbooru API v1.13.0";
 # const
   c_anonymous_tag_limit="2";      # API const
   c_registred_tag_limit="6";      # API const
@@ -59,6 +59,7 @@ init() {
   l_tag_limit="0";                 # defined in parse_args
   l_download_extensions_allow="";  # downloading extensions
   l_download_extensions_deny="";   # downloading extensions
+  l_download_tag_limit_bypass="false";   #
   if in_system "wget"; then
     l_downloader="wget";
   elif in_system "fetch"; then
@@ -790,19 +791,6 @@ validate_values() {
       return 17;
     ;;
   esac;
-  IFS=",";
-  for tag in ${s_tags}; do
-    tagcount="$(printf "%s" "${tag}" | wc -w)";
-    if [ "${tagcount}" -gt "${l_tag_limit}" ]; then
-      tag="$(printf "%s" "${tag}" | sed 's/^[[:space:]]*//g;s/[[:space:]]*$//g;')";
-      if [ "${s_auth_string}" ]; then
-        notify 1 "number of intersecting tags ('${tag}') can't be more then ${c_registred_tag_limit} for registred user.\n";
-      else
-        notify 1 "number of intersecting tags ('${tag}') can't be more then ${c_anonymous_tag_limit} for anonymous user. You can rise it to ${c_registred_tag_limit} by registering and specifing username (-u,s_auth_login) and password (-p,s_auth_password_hash) options.\n";
-      fi;
-      return 18;
-    fi;
-  done;
   return 0;
 )
 };
@@ -1065,7 +1053,7 @@ init_danbooru() {
       result="0 mixed ${tag}";
       l_search_mode="deep";
     else
-      result="$(printf "%s\n" "${result}" | sed -n '/<tag /{s/type="0"/type="general"/g;s/type="1"/type="artist"/g;s/type="3"/type="title"/g;s/type="4"/type="character"/g;s/.*type="\([^"]*\)" count="\([0-9]*\)".*name="\([^"]*\)".*/\2 \1 \3/g;p;};')";
+      result="$(printf "%s\n" "${result}" | sed -n '/<tag /{s/type="0"/type="general"/g;s/type="1"/type="artist"/g;s/type="3"/type="title"/g;s/type="4"/type="character"/g;s/.*type="\([^"]*\)".*count="\([0-9]*\)".*name="\([^"]*\)".*/\2 \1 \3/g;p;};')";
       if [ "${l_search_reverse_order}" = "true" ]; then
         result="$(printf "%s\n" "${result}" | tac )";
       fi;
@@ -1193,6 +1181,17 @@ main() {
   IFS=",";
   for tag in ${s_tags}; do
     tag="$(printf "%s" "${tag}" | sed 's/^[[:space:]]*//g;s/[[:space:]]*$//g;')"
+    tagcount="$(printf "%s" "${tag}" | wc -w)";
+    if [ "${tagcount}" -gt "${l_tag_limit}" ]; then
+      tag="$(printf "%s" "${tag}" | sed 's/^[[:space:]]*//g;s/[[:space:]]*$//g;')";
+      if [ "${s_auth_string}" ]; then
+        notify 3 "number of natively intersecting tags ('${tag}') can't be more then ${c_registred_tag_limit} for registred user.\n";
+      else
+        notify 3 "number of natively intersecting tags ('${tag}') can't be more then ${c_anonymous_tag_limit} for anonymous user. You can rise it up to ${c_registred_tag_limit} by registering and specifing username (-u,s_auth_login) and password (-p,s_auth_password_hash) options.\n";
+      fi;
+      notify 2 "Activating manual tag intersection.\n";
+      l_download_tag_limit_bypass="true";
+    fi;
     case "${l_mode}" in
       ("search") search "${tag}"; ;;
       ("download") parser "${tag}"; ;;
@@ -1209,8 +1208,8 @@ rm -f "${p_temp_dir}/$$-danbooru_grabber_query_result";
 rm -f "${p_temp_dir}/$$-danbooru_grabber_temp_content_file";
 set +f;
 IFS="";
-for tempfile in ${p_temp_dir}/*; do
-  if [ "${tempfile}" = "${p_temp_dir}/*" ]; then
+for tempfile in ${p_temp_dir}/*-danbooru_grabber; do
+  if [ "${tempfile}" = "${p_temp_dir}/*-danbooru_grabber" ]; then
     continue;
   fi;
   pid="$(printf "%s" "${tempfile}" | sed 's/-.*//g;s|.*/||g;')";
