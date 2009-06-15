@@ -39,7 +39,7 @@
 # output:
 # side effect: defines variables
 init() {
-  g_version="Danbooru v7sh grabber v0.10.9 for Danbooru API v1.13.0";
+  g_version="Danbooru v7sh grabber v0.10.10 for Danbooru API v1.13.0";
 # const
   c_anonymous_tag_limit="2";      # API const
   c_registred_tag_limit="6";      # API const
@@ -48,7 +48,7 @@ init() {
   l_mode="search";                 # "search" "download"
   l_search_mode="simple"           # "simple" "deep"
   l_search_order="count";          # "count" "name" "date"
-  l_search_reverse_orderl_search_reverse_order="false";  # "false" "true"
+  l_search_reverse_order="false";  # "false" "true"
   l_download_mode="onedir";        # "onedir" "onedir:symlinks" "samedir" "samedir:symlinks"
   l_download_page_size="100";      # 100 1..100..*
   l_download_page_offset="1";      # 1 1..
@@ -127,36 +127,17 @@ in_system() {
 dir_realpath() {
 (
   given_path="$1";
-  realpath="${PWD}";
-  IFS="/";
-  count=0;
-  for part_of_path in ${given_path}; do
-    case "${part_of_path}" in
-      ("")
-        if [ "${count}" -eq 0 ]; then
-          if [ ! -d "${given_path}" ]; then
-            printf "%s" "${given_path%/*}";
-          else
-            printf "%s" "${given_path}";
-          fi;
-          return 0;
-        fi;
-      ;;
-      ("..")
-        realpath="${realpath%/*}";
-      ;;
-      (".") ;;
-      (*)
-        realpath="${realpath}/${part_of_path}";
-      ;;
-    esac;
-    count="$((${count}+1))";
-  done;
-  if [ ! -d "${realpath}" ]; then
-    printf "%s" "${realpath%/*}";
-  else
-    printf "%s" "${realpath}";
+  if [ ! -d "${given_path}" ]; then
+    given_path="${given_path%/*}"
   fi;
+  if [ ! "${give_path}" ]; then
+    given_path=".";
+  fi;
+  if [ ! -d "${given_path}" ]; then
+    return 1;
+  fi;
+  cd "${given_path}";
+  printf "%s" "${PWD}";
   return 0;
 )
 };
@@ -698,7 +679,8 @@ validate_values() {
     if [ ! -e "$(dirname "${p_conf_file}")" ]; then
       ask_to_make "dir" "$(dirname "${p_conf_file}")" "force";
     fi;
-    p_conf_file="$(ask_to_make "conf" "${p_conf_file}" "configuration file")";
+#    p_conf_file="$(ask_to_make "conf" "${p_conf_file}" "configuration file")";
+    write_conf;
   fi;
 (
   if [ "${l_fail_delay}" -lt 0 ]; then
@@ -871,6 +853,7 @@ get_file() {
 # tested on ~30 thousands of images without any single match, so considired as image-binary-safe.
     if grep -q "The site is down for maintenance" "${local_filepath}"; then
       notify 1 "Danbooru is currently down for maintenance.\n";
+      rm "${local_filepath}";
       sleep "${l_fail_delay}";
       if [ "${persist}" = "true" ]; then
         continue;
@@ -911,7 +894,7 @@ download() {
   fi;
   post_file_url="$(printf "%s" "${post_file_url}" | sed 's|\\/|\/|g')";
   tmpfile="${p_temp_dir}/$$-danbooru_grabber_temp_content_file";
-  get_file "${post_file_url}" "${tmpfile}";
+  get_file "persist" "${post_file_url}" "${tmpfile}";
   case "${l_download_mode}" in
     ("onedir")
       if [ ! -d "${p_storage_dir}/${safe_tag}" ]; then
