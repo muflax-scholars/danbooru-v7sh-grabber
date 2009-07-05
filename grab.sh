@@ -39,7 +39,7 @@
 # output:
 # side effect: defines variables
 init() {
-  g_version="Danbooru v7sh grabber v0.10.10 for Danbooru API v1.13.0";
+  g_version="Danbooru v7sh grabber v0.10.11 for Danbooru API v1.13.0";
 # const
   c_anonymous_tag_limit="2";      # API const
   c_registred_tag_limit="6";      # API const
@@ -83,6 +83,7 @@ init() {
   p_storage_big_dir="${p_storage_dir}/files";
   p_temp_dir="${p_exec_dir}/tmp";
   p_conf_file="${HOME}/.config/danbooru-grab.conf";
+  p_db_file="${p_storage_dir}/.tags";
 # string
   s_auth_string="";
   s_auth_login="";
@@ -130,7 +131,7 @@ dir_realpath() {
   if [ ! -d "${given_path}" ]; then
     given_path="${given_path%/*}"
   fi;
-  if [ ! "${give_path}" ]; then
+  if [ ! "${given_path}" ]; then
     given_path=".";
   fi;
   if [ ! -d "${given_path}" ]; then
@@ -261,6 +262,8 @@ parse_args() {
       ("-9") return 2; ;;
       ("-w"|"--write-config") l_write_conf="true"; ;;
       ("-d"|"--download") l_mode="download"; ;;
+      ("-a"|"--actualize") l_mode="actualize"; ;;
+      ("-an"|"--actualize-no-checks") l_mode="actualize-no-checks"; ;;
       ("-s"|"--search") l_action="search"; ;;
       ("-sr"|"--search-reverse") l_search_reverse_order="true"; ;;
       ("-n"|"--no-checks") l_validate_values="false"; ;;
@@ -332,6 +335,8 @@ USAGE: '$0' [OPTIONS] <TAGS>
                Default: '${p_temp_dir}'
   -d   --download
                Downloads images related to specified tags.
+  -a   --actualize
+               Actualizes tags contents according to ${p_db_file} file.
   -dm  --download-mode         <onedir|samedir|onedir:symlinks|samedir:symlinks>
                Download mechanism type. 
                Default: '${l_download_mode}'
@@ -768,8 +773,10 @@ validate_values() {
         return 16;
       fi;
     ;;
+    ("actualize") ;;
+    ("actualize-no-checks") ;;
     (*)
-      notify 1 "l_action must be 'search' or 'download'.\n";
+      notify 1 "l_action must be 'search', 'actualize', 'actualize-no-checks' or 'download'.\n";
       return 17;
     ;;
   esac;
@@ -821,51 +828,6 @@ downloader() {
 )
 };
 
-# should download files and handle download errors
-#
-# args: url local_path
-# output:
-# side effect: saves file to local path
-get_file() {
-(
-  persist="false"; 
-  if [ "$1" = "persist" ]; then
-    persist="true"; 
-    shift;
-  fi;
-  url="$1";
-  local_filepath="$2";
-#  url_safe="$(printf "%s" "${url}" | sed 's,/,\\/,g;s,&,\\&,g;')";
-#  safe_filepath="$(printf "%s" "${local_filepath}" | sed 's,/,\\/,g;s,&,\\&,g;')";
-  if [ -e "${local_filepath}" ]; then
-    rm "${local_filepath}";
-  fi;
-  while [ true ]; do
-    while [ true ]; do
-      result="$(downloader "${url}" "${local_filepath}")";
-      case "$?" in
-        (0) break; ;;
-        (1) notify 3 "HTTP ERROR "${result}"\n"; ;;
-        (2) notify 1 "unable to resolve host address '${url}'.\n"; ;;
-      esac;
-      sleep "${l_fail_delay}";
-    done;
-# tested on ~30 thousands of images without any single match, so considired as image-binary-safe.
-    if grep -q "The site is down for maintenance" "${local_filepath}"; then
-      notify 1 "Danbooru is currently down for maintenance.\n";
-      rm "${local_filepath}";
-      sleep "${l_fail_delay}";
-      if [ "${persist}" = "true" ]; then
-        continue;
-      fi;
-      return 2;
-    fi;
-    break;
-  done;
-  return 0;
-)
-};
-
 # should download, move and rename files
 #
 # args:
@@ -890,6 +852,20 @@ download() {
   esac;
   if [ -e "${file_path}" ]; then
     notify 2 "skip\n";
+    if [ "${l_download_mode}" = "onedir:symlinks" ] || [ "${l_download_mode}" = "samedir:symlinks" ]; then
+      IFS=" ";
+      for i_tag in ${post_tags}; do
+        i_tag="$(printf "%s" "${i_tag}" | sed 's,[/],,g;s/[[:space:]]\{1,\}/-/g;')";
+        if [ "${i_tag}" = "${safe_tag}" ] && [ "${l_download_mode}" = "onedir:symlinks" ]; then
+          continue;
+        fi;
+        if [ ! -d "${p_storage_dir}/${i_tag}" ]; then
+          mkdir "${p_storage_dir}/${i_tag}";
+        fi;
+        ln -s "${file_path}" "${p_storage_dir}/${i_tag}/" 2>/dev/null;
+        touch -acm -t "$(dateformat "${post_created_at}")" "${p_storage_dir}/${i_tag}/${post_file_name}";
+      done;
+    fi;
     return 0;
   fi;
   post_file_url="$(printf "%s" "${post_file_url}" | sed 's|\\/|\/|g')";
@@ -922,7 +898,7 @@ download() {
         if [ ! -d "${p_storage_dir}/${i_tag}" ]; then
           mkdir "${p_storage_dir}/${i_tag}";
         fi;
-        ln -s "${file_path}" "${p_storage_dir}/${i_tag}/";
+        ln -s "${file_path}" "${p_storage_dir}/${i_tag}/" 2>/dev/null;
         touch -acm -t "$(dateformat "${post_created_at}")" "${p_storage_dir}/${i_tag}/${post_file_name}";
       done;
     ;;
@@ -961,6 +937,51 @@ export_out() {
 # output:
 # side effect: defines funcionts
 init_danbooru() {
+# should download files and handle download errors
+#
+# args: url local_path
+# output:
+# side effect: saves file to local path
+  get_file() {
+  (
+    persist="false"; 
+    if [ "$1" = "persist" ]; then
+      persist="true"; 
+      shift;
+    fi;
+    url="$1";
+    local_filepath="$2";
+#    url_safe="$(printf "%s" "${url}" | sed 's,/,\\/,g;s,&,\\&,g;')";
+#    safe_filepath="$(printf "%s" "${local_filepath}" | sed 's,/,\\/,g;s,&,\\&,g;')";
+    if [ -e "${local_filepath}" ]; then
+      rm "${local_filepath}";
+    fi;
+    while [ true ]; do
+      while [ true ]; do
+        result="$(downloader "${url}" "${local_filepath}")";
+        case "$?" in
+          (0) break; ;;
+          (1) notify 3 "HTTP ERROR "${result}"\n"; ;;
+          (2) notify 1 "unable to resolve host address '${url}'.\n"; ;;
+        esac;
+        sleep "${l_fail_delay}";
+      done;
+# tested on ~30 thousands of images without any single match, so considired as image-binary-safe.
+      if grep -q "The site is down for maintenance" "${local_filepath}"; then
+        notify 1 "Danbooru is currently down for maintenance.\n";
+        rm "${local_filepath}";
+        sleep "${l_fail_delay}";
+        if [ "${persist}" = "true" ]; then
+          continue;
+        fi;
+        return 2;
+      fi;
+      break;
+    done;
+    return 0;
+  )
+  };
+  
   # should process api queries, logging in and urlencoding
   #
   # args: type params ispersist
@@ -1072,6 +1093,7 @@ init_danbooru() {
       notify 1 "there is no tag '${tag}'.\n";
       return 1;
     fi;
+    add_tag_to_db "${tag}";
     total_pages="$((${total_count}/${l_download_page_size}))";
     if [ "$((${total_count}%${l_download_page_size}))" -gt 0 ]; then
       total_pages="$((${total_pages}+1))";
@@ -1132,15 +1154,53 @@ init_danbooru() {
   };
 };
 
+add_tag_to_db() {
+(
+  tag="$1";
+  printf "%s\n" "${tag}" >> "${p_db_file}";
+)
+};
+
+actualize() {
+(
+  if [ "$1" != "nocheck" ]; then
+    tmp="$(cat "${p_db_file}" | sed -n '/^[[:space:]]*[^#]\+/{p;};' | uniq | while read tag; do
+      total_count="$(get_count "persist" "${tag}")";
+      if [ "${total_count}" -eq 0 ]; then
+        notify 1 "there is no tag '${tag}'.\n";
+        continue;
+      fi;
+      printf "%s\n" "${tag}";
+    done)";
+    printf "%s\n" "${tmp}" > "${p_db_file}";
+  fi;
+  IFS='
+';
+  main -d "$(cat "${p_db_file}" | sed -n '/^[[:space:]]*[^#]/{s/$/,/g;p}')" ;
+)
+};
+
 # should do everything that this grabber should
 #
 # args:
 # output:
 # side effect: works sometimes
 main() {
-  set +x;
-  set -f;
+#  set -x;
+  set +f;
   init || { return 1$?; };
+  cd "${p_temp_dir}";
+  for tempfile in *-danbooru_grabber_*; do
+    if [ ! -e "${tempfile}" ]; then
+      continue;
+    fi;
+    if [ "${tempfile}" = "${p_temp_dir}/*-danbooru_grabber" ]; then
+      continue;
+    fi;
+    pid="$(printf "%s" "${tempfile}" | sed 's/-.*//g;s|.*/||g;')";
+    ps -p "${pid}" 1>/dev/null || { rm ${tempfile}; };
+  done;
+  cd "$OLDPWD";
   read_conf;
   parse_args "get_conf" "$@";
   read_conf;
@@ -1180,6 +1240,10 @@ main() {
       ("download") parser "${tag}"; ;;
     esac;
   done;
+  case "${l_mode}" in
+    ("actualize") actualize; ;;
+    ("actualize-no-checks") actualize "nocheck"; ;;
+  esac;
   return 0;
 )
 };
@@ -1191,11 +1255,4 @@ rm -f "${p_temp_dir}/$$-danbooru_grabber_query_result";
 rm -f "${p_temp_dir}/$$-danbooru_grabber_temp_content_file";
 set +f;
 IFS="";
-for tempfile in ${p_temp_dir}/*-danbooru_grabber; do
-  if [ "${tempfile}" = "${p_temp_dir}/*-danbooru_grabber" ]; then
-    continue;
-  fi;
-  pid="$(printf "%s" "${tempfile}" | sed 's/-.*//g;s|.*/||g;')";
-  ps -p "${pid}" 1>/dev/null || { rm ${tempfile}; };
-done;
 exit "${exitcode}";
