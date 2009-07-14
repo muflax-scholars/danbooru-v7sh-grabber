@@ -39,7 +39,7 @@
 # output:
 # side effect: defines variables
 init() {
-  g_version="Danbooru v7sh grabber v0.10.11 for Danbooru API v1.13.0";
+  g_version="Danbooru v7sh grabber v0.10.12 for Danbooru API v1.13.0";
 # const
   c_anonymous_tag_limit="2";      # API const
   c_registred_tag_limit="6";      # API const
@@ -56,6 +56,7 @@ init() {
   l_validate_values="true";        # "true" "false"
   l_write_conf="false";            # "false" "true"
   l_fail_delay="10";               # 10 0..
+  l_noadd="false";                 # auto add tags to actualize
   l_tag_limit="0";                 # defined in parse_args
   l_download_extensions_allow="";  # downloading extensions
   l_download_extensions_deny="";   # downloading extensions
@@ -337,6 +338,9 @@ USAGE: '$0' [OPTIONS] <TAGS>
                Downloads images related to specified tags.
   -a   --actualize
                Actualizes tags contents according to ${p_db_file} file.
+  -an  --actualize-no-checks
+               Actualizes tags contents according to ${p_db_file} file, but do
+               not check if such tags exists.
   -dm  --download-mode         <onedir|samedir|onedir:symlinks|samedir:symlinks>
                Download mechanism type. 
                Default: '${l_download_mode}'
@@ -573,6 +577,10 @@ p_storage_big_dir='${p_storage_big_dir}'
 # Group intlo list using coma.
 #l_download_extensions_allow='jpg,gif,png'
 
+# If set to true, no tags will be added to '${p_db_file}'
+# Default: 'false'
+l_noadd=false
+
 # If defined, do not download specified extenstions
 # Default: ''
 # Group intlo list using coma.
@@ -772,12 +780,19 @@ validate_values() {
         notify 1 "l_download_page_offset (-dpo) must not be lesser then 1.\n";
         return 16;
       fi;
+      case "${l_noadd}" in
+        ("true"|"false") ;;
+        (*)
+          notify 1 "l_noadd be 'true' or 'false'.\n";
+          return 17;
+        ;;
+      esac;
     ;;
     ("actualize") ;;
     ("actualize-no-checks") ;;
     (*)
       notify 1 "l_action must be 'search', 'actualize', 'actualize-no-checks' or 'download'.\n";
-      return 17;
+      return 18;
     ;;
   esac;
   return 0;
@@ -1003,6 +1018,7 @@ init_danbooru() {
       arg="$(printf "%s" "${param}" | sed 's/=.*//g;')";
       case "${arg}" in
         ("tags"|"name")
+          out="";
           for tag in $(printf "%s" "${param}" | sed 's/^[^=]*=//g'); do
             out="${out}+$(printf "%s" "${tag}" | urlencode)";
           done;
@@ -1093,7 +1109,9 @@ init_danbooru() {
       notify 1 "there is no tag '${tag}'.\n";
       return 1;
     fi;
-    add_tag_to_db "${tag}";
+    if [ "${l_noadd}" != "true" ] && [ "$(grep -c "^[[:space:]]*${tag}[[:space:]]*$" "${p_db_file}")" -eq 0 ]; then
+      add_tag_to_db "${tag}";
+    fi;
     total_pages="$((${total_count}/${l_download_page_size}))";
     if [ "$((${total_count}%${l_download_page_size}))" -gt 0 ]; then
       total_pages="$((${total_pages}+1))";
@@ -1163,20 +1181,42 @@ add_tag_to_db() {
 
 actualize() {
 (
+  if [ ! -e "${p_db_file}" ]; then
+    touch "${p_db_file}";
+    tagsguide="\
+# in this file tags adding after each download.
+# one tag per line in usual -d syntax
+# eg:
+#
+# iwakura_lain
+# touhou cirno
+# cirno chen yakumo_ran
+";
+    printf "%s" "${tagsguide}" > "${p_db_file}";
+  fi;
+  content="$(cat "${p_db_file}" | sed -n '/^[[:space:]]*[^#]\+/{s/^[[:space:]]*//g;s/[[:space:]]*$//g;p;};' | uniq)";
+  if [ ! "${content}" ]; then
+    notify 3 "No tags for auto update.\n";
+    return 0;
+  fi;
   if [ "$1" != "nocheck" ]; then
-    tmp="$(cat "${p_db_file}" | sed -n '/^[[:space:]]*[^#]\+/{p;};' | uniq | while read tag; do
+    content="$(printf "${content}\n" | while read tag; do
       total_count="$(get_count "persist" "${tag}")";
       if [ "${total_count}" -eq 0 ]; then
-        notify 1 "there is no tag '${tag}'.\n";
+        notify 3 "there is no tag '${tag}'.\n";
         continue;
+      fi;
+      if [ "$(grep -c "^[[:space:]]*${tag}[[:space:]]*$" "${p_db_file}")" -gt 1 ]; then
+        notify 3 "there is multiple entries for tag '${tag}'.\n";
       fi;
       printf "%s\n" "${tag}";
     done)";
-    printf "%s\n" "${tmp}" > "${p_db_file}";
   fi;
   IFS='
 ';
-  main -d "$(cat "${p_db_file}" | sed -n '/^[[:space:]]*[^#]/{s/$/,/g;p}')" ;
+  
+  printf "%s\n" "executing: $0 -d '$(printf "%s" $(printf "%s" "${content}" | sed 's/$/, /g;') | sed 's/[,]*[[:space:]]*$//g;')'";
+  main "noadd" -d "$(printf "%s" $(printf "%s" "${content}" | sed 's/$/,/g;') | sed 's/[,]*$//g;')";
 )
 };
 
@@ -1187,6 +1227,10 @@ actualize() {
 # side effect: works sometimes
 main() {
 #  set -x;
+  if [ "$1" = "noadd" ]; then
+    l_noadd="true";
+    shift;
+  fi;
   set +f;
   init || { return 1$?; };
   cd "${p_temp_dir}";
