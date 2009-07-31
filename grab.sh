@@ -39,7 +39,7 @@
 # output:
 # side effect: defines variables
 init() {
-  g_version="Danbooru v7sh grabber v0.10.12 for Danbooru API v1.13.0";
+  g_version="Danbooru v7sh grabber v0.10.13 for Danbooru API v1.13.0";
 # const
   c_anonymous_tag_limit="2";      # API const
   c_registred_tag_limit="6";      # API const
@@ -1112,10 +1112,7 @@ init_danbooru() {
     if [ "${l_noadd}" != "true" ] && [ "$(grep -c "^[[:space:]]*${tag}[[:space:]]*$" "${p_db_file}")" -eq 0 ]; then
       add_tag_to_db "${tag}";
     fi;
-    total_pages="$((${total_count}/${l_download_page_size}))";
-    if [ "$((${total_count}%${l_download_page_size}))" -gt 0 ]; then
-      total_pages="$((${total_pages}+1))";
-    fi;
+    total_pages="$(((${total_count}/${l_download_page_size})+((${total_count}%${l_download_page_size)&&1)))";
     page="${l_download_page_offset}";
     while [ "${page}" -le "${total_pages}" ]; do
       notify 2 "  Switching to page ${page} of ${total_pages}.\n";
@@ -1233,18 +1230,20 @@ main() {
   fi;
   set +f;
   init || { return 1$?; };
-  cd "${p_temp_dir}";
-  for tempfile in *-danbooru_grabber_*; do
-    if [ ! -e "${tempfile}" ]; then
-      continue;
-    fi;
-    if [ "${tempfile}" = "${p_temp_dir}/*-danbooru_grabber" ]; then
-      continue;
-    fi;
-    pid="$(printf "%s" "${tempfile}" | sed 's/-.*//g;s|.*/||g;')";
-    ps -p "${pid}" 1>/dev/null || { rm ${tempfile}; };
-  done;
-  cd "$OLDPWD";
+  if [ -d "${p_temp_dir}" ]; then
+    cd "${p_temp_dir}";
+    for tempfile in *-danbooru_grabber_*; do
+      if [ ! -e "${tempfile}" ]; then
+        continue;
+      fi;
+      if [ "${tempfile}" = "${p_temp_dir}/*-danbooru_grabber" ]; then
+        continue;
+      fi;
+      pid="$(printf "%s" "${tempfile}" | sed 's/-.*//g;s|.*/||g;')";
+      ps -p "${pid}" 1>/dev/null || { rm ${tempfile}; };
+    done;
+    cd "$OLDPWD";
+  fi;
   read_conf;
   parse_args "get_conf" "$@";
   read_conf;
