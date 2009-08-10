@@ -39,7 +39,7 @@
 # output:
 # side effect: defines variables
 init() {
-  g_version="Danbooru v7sh grabber v0.10.13 for Danbooru API v1.13.0";
+  g_version="Danbooru v7sh grabber v0.10.14 for Danbooru API v1.13.0";
 # const
   c_anonymous_tag_limit="2";      # API const
   c_registred_tag_limit="6";      # API const
@@ -1112,7 +1112,7 @@ init_danbooru() {
     if [ "${l_noadd}" != "true" ] && [ "$(grep -c "^[[:space:]]*${tag}[[:space:]]*$" "${p_db_file}")" -eq 0 ]; then
       add_tag_to_db "${tag}";
     fi;
-    total_pages="$(((${total_count}/${l_download_page_size})+((${total_count}%${l_download_page_size)&&1)))";
+    total_pages="$(((${total_count}/${l_download_page_size})+((${total_count}%${l_download_page_size})&&1)))";
     page="${l_download_page_offset}";
     while [ "${page}" -le "${total_pages}" ]; do
       notify 2 "  Switching to page ${page} of ${total_pages}.\n";
