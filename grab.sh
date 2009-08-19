@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/dash
 
 # Used binaries:
 # sh cat sed grep od wc mv ln rm [ printf touch sleep cut
@@ -39,7 +39,7 @@
 # output:
 # side effect: defines variables
 init() {
-  g_version="Danbooru v7sh grabber v0.10.14 for Danbooru API v1.13.0";
+  g_version="Danbooru v7sh grabber v0.10.15 for Danbooru API v1.13.0";
 # const
   c_anonymous_tag_limit="2";      # API const
   c_registred_tag_limit="6";      # API const
@@ -105,7 +105,7 @@ init() {
 # side effect:
 in_system() {
 (
-  program_name="$1";
+  program_name="${1-}";
   case "${PATH}" in
     (*[!:]:) PATH="${PATH}:"; ;;
   esac;
@@ -128,7 +128,7 @@ in_system() {
 # side effect:
 dir_realpath() {
 (
-  given_path="$1";
+  given_path="${1-}";
   if [ ! -d "${given_path}" ]; then
     given_path="${given_path%/*}"
   fi;
@@ -151,7 +151,7 @@ dir_realpath() {
 # side effect:
 dirname() {
 (
-  path="$1";
+  path="${1-}";
   printf "%s" "${path%/*}";
   return 0;
 )
@@ -178,7 +178,7 @@ urlencode() {
 # side effect:
 dateformat() {
 (
-  date="$1";
+  date="${1-}";
   out="$(printf "%s" "${date}" | sed '
     s/^[a-zA-Z]*[[:space:]]*\([a-zA-Z]*\)[[:space:]]*\([0-9]*\)[[:space:]]*\([0-9]*\):\([0-9]*\):\([0-9]*\)[[:space:]]*[0-9+-]*[[:space:]]*\([0-9]*\)/\6\1\2\3\4.\5/g;
     s/Jan/01/g;s/Feb/02/g;s/Mar/03/g;s/Apr/04/g;s/May/05/g;s/Jun/06/g;s/Jul/07/g;s/Aug/08/g;s/Sep/09/g;s/Oct/10/g;s/Nov/11/g;s/Dec/12/g;')";
@@ -194,7 +194,7 @@ dateformat() {
 # side effect: prints messge to cerr
 notify() {
 (
-  print_level="$1";
+  print_level="${1-}";
   shift;
   message="$@";
   verbose_level="${l_verbose_level}";
@@ -221,8 +221,8 @@ notify() {
 # side effect:
 password_hash() {
 (
-  password_salt="$1";
-  password="$(printf "%s" "$2" | sed 's,/,\\/,g;s,&,\\&,g;')";
+  password_salt="${1-}";
+  password="$(printf "%s" "${2-}" | sed 's,/,\\/,g;s,&,\\&,g;')";
   salted_pass="$(printf "%s" "${password_salt}" | sed "s/<password>/${password}/g;")";
   case "${l_hasher}" in
     ("sha1")
@@ -243,22 +243,23 @@ password_hash() {
 # output:
 # side effect: redefines global variables
 parse_args() {
-  if [ "$1" = "get_conf" ]; then
+  if [ "${1-}" = "get_conf" ]; then
     shift;
-    while [ "$1" ]; do
-      case "$1" in
-        ("-c"|"--config")  p_conf_file="$2"; [ "$2" ] && { shift; }; ;; 
+    while [ "${1-}" ]; do
+      case "${1-}" in
+        ("-c"|"--config") p_conf_file="${2-}"; [ "${2-}" ] && { shift; }; ;; 
       esac;
       shift;
     done;
     return 0;
   fi;
   shift;
-  if [ ! "$1" ]; then
+  if [ ! "${1-}" ]; then
     set -- "--help";
   fi;
-  while [ "$1" ]; do
-    case "$1" in
+  s_tags="";
+  while [ "${1-}" ]; do
+    case "${1-}" in
       ("-?"|"-h"|"-help"|"--help") return 1; ;;
       ("-9") return 2; ;;
       ("-w"|"--write-config") l_write_conf="true"; ;;
@@ -268,25 +269,25 @@ parse_args() {
       ("-s"|"--search") l_action="search"; ;;
       ("-sr"|"--search-reverse") l_search_reverse_order="true"; ;;
       ("-n"|"--no-checks") l_validate_values="false"; ;;
-      ("-v"|"--verbosity") l_verbose_level="$(printf "%d" "$2" 2>/dev/null)"; [ "$2" ] && { shift; } ; ;;
-      ("-td"|"--tempdir") p_temp_dir="$2"; [ "$2" ] && { shift; }; ;;
-      ("-dm"|"--download-mode") l_download_mode="$2"; [ "$2" ] && { shift; }; ;;
-      ("-dea"|"--download-extensions-allow") l_download_extensions_allow="$2"; [ "$2" ] && { shift; }; ;;
-      ("-ded"|"--download-extensions-deny") l_download_extensions_deny="$2"; [ "$2" ] && { shift; }; ;;
-      ("-def"|"--download-export-format") s_export_format="$2"; [ "$2" ] && { shift; }; ;;
-      ("-dpo"|"--download-page-offset") l_download_page_offset="$(printf "%d" "$2" 2>/dev/null)"; [ "$2" ] && { shift; }; ;;
-      ("-dps"|"--download-page-size") l_download_page_size="$2"; [ "$2" ] && { shift; }; ;;
-      ("-dsd"|"--download-storage-dir") p_storage_dir="$2"; [ "$2" ] && { shift; }; ;;
-      ("-dsn"|"--download-samedir") p_storage_big_dir="$2"; [ "$2" ] && { shift; }; ;;
-      ("-dfn"|"--download-file-name") s_rename_string="$2"; [ "$2" ] && { shift; }; ;;
-      ("-sm"|"--search-mode") l_search_mode="$2";  [ "$2" ] && { shift; }; ;;
-      ("-so"|"--search-order") l_search_order="$2"; [ "$2" ] && { shift; }; ;;
-      ("-u"|"--username") s_auth_login="$2"; [ "$2" ] && { shift; }; ;;
-      ("-p"|"--password") tmp_password="$2"; arg_tmp_password="true"; [ "$2" ] && { shift; }; ;;
-      ("-ps"|"--password-salt") s_auth_password_salt="$2"; [ "$2" ] && { shift; }; ;;
-      ("-url"|"--url") p_danbooru_url="$2"; [ "$2" ] && { shift; }; ;;
-      ("-fd"|"--fail-delay") l_fail_delay="$(printf "%d" "$2" 2>/dev/null)"; [ "$2" ] && { shift; }; ;;
-      (*) s_tags="${s_tags} $1"; arg_s_tags="true"; ;;
+      ("-v"|"--verbosity") l_verbose_level="$(printf "%d" "${2-}" 2>/dev/null)"; [ "${2-}" ] && { shift; } ; ;;
+      ("-td"|"--tempdir") p_temp_dir="${2-}"; [ "${2-}" ] && { shift; }; ;;
+      ("-dm"|"--download-mode") l_download_mode="${2-}"; [ "${2-}" ] && { shift; }; ;;
+      ("-dea"|"--download-extensions-allow") l_download_extensions_allow="${2-}"; [ "${2-}" ] && { shift; }; ;;
+      ("-ded"|"--download-extensions-deny") l_download_extensions_deny="${2-}"; [ "${2-}" ] && { shift; }; ;;
+      ("-def"|"--download-export-format") s_export_format="${2-}"; [ "${2-}" ] && { shift; }; ;;
+      ("-dpo"|"--download-page-offset") l_download_page_offset="$(printf "%d" "${2-}" 2>/dev/null)"; [ "${2-}" ] && { shift; }; ;;
+      ("-dps"|"--download-page-size") l_download_page_size="${2-}"; [ "${2-}" ] && { shift; }; ;;
+      ("-dsd"|"--download-storage-dir") p_storage_dir="${2-}"; [ "${2-}" ] && { shift; }; ;;
+      ("-dsn"|"--download-samedir") p_storage_big_dir="${2-}"; [ "${2-}" ] && { shift; }; ;;
+      ("-dfn"|"--download-file-name") s_rename_string="${2-}"; [ "${2-}" ] && { shift; }; ;;
+      ("-sm"|"--search-mode") l_search_mode="${2-}";  [ "${2-}" ] && { shift; }; ;;
+      ("-so"|"--search-order") l_search_order="${2-}"; [ "${2-}" ] && { shift; }; ;;
+      ("-u"|"--username") s_auth_login="${2-}"; [ "${2-}" ] && { shift; }; ;;
+      ("-p"|"--password") tmp_password="${2-}"; arg_tmp_password="true"; [ "${2-}" ] && { shift; }; ;;
+      ("-ps"|"--password-salt") s_auth_password_salt="${2-}"; [ "${2-}" ] && { shift; }; ;;
+      ("-url"|"--url") p_danbooru_url="${2-}"; [ "${2-}" ] && { shift; }; ;;
+      ("-fd"|"--fail-delay") l_fail_delay="$(printf "%d" "${2-}" 2>/dev/null)"; [ "${2-}" ] && { shift; }; ;;
+      (*) s_tags="${s_tags} ${1-}"; arg_s_tags="true"; ;;
     esac;
     shift;
   done;
@@ -640,9 +641,9 @@ l_validate_values='true'
 # side effect: creates files and directories
 ask_to_make() {
 (
-  type="$1";
-  path="$2";
-  name="$3";
+  type="${1-}";
+  path="${2-}";
+  name="${3-}";
   if [ "${name}" != "force" ]; then
     notify 2 "Enter ${name} path [${path}]: ";
     read -r newpath;
@@ -806,8 +807,8 @@ validate_values() {
 # side effect: saves file to local path
 downloader() {
 (
-  url="$1";
-  local_filepath="$2";
+  url="${1-}";
+  local_filepath="${2-}";
   case "${l_downloader}" in
     ("wget")
       result="$(LANG=C wget -c -O "${local_filepath}" "${url}" 2>&1)" || {
@@ -960,12 +961,12 @@ init_danbooru() {
   get_file() {
   (
     persist="false"; 
-    if [ "$1" = "persist" ]; then
+    if [ "${1-}" = "persist" ]; then
       persist="true"; 
       shift;
     fi;
-    url="$1";
-    local_filepath="$2";
+    url="${1-}";
+    local_filepath="${2-}";
 #    url_safe="$(printf "%s" "${url}" | sed 's,/,\\/,g;s,&,\\&,g;')";
 #    safe_filepath="$(printf "%s" "${local_filepath}" | sed 's,/,\\/,g;s,&,\\&,g;')";
     if [ -e "${local_filepath}" ]; then
@@ -1004,9 +1005,9 @@ init_danbooru() {
   # side effect:
   query() {
   (
-    type="$1";
-    params="$2";
-    persist="$3";
+    type="${1-}";
+    params="${2-}";
+    persist="${3:-}";
     case "${type}" in
       ("tag") url="${p_danbooru_url}/tag/index.xml?"; ;;
       ("post") url="${p_danbooru_url}/post/index.xml?"; ;;
@@ -1045,11 +1046,11 @@ init_danbooru() {
   # side effect:
   get_count() {
   (
-    if [ "$1" = "persist" ]; then
-      persist="$1";
+    if [ "${1-}" = "persist" ]; then
+      persist="${1-}";
       shift;
     fi;
-    tag="$1";
+    tag="${1-}";
     tagcount="$(($(printf "%s" "${tag}" | grep -c " ")+1))";
     if [ "${tagcount}" -lt "${l_tag_limit}" ]; then
       tag="${tag} status:active";
@@ -1067,8 +1068,9 @@ init_danbooru() {
   # side effect: print search results
   search() {
   (
-    tag="$1";
+    tag="${1-}";
     result="$(query "tag" "order=${l_search_order},name=${tag}")" || { return 1; };
+
     if [ "$(printf "%s" "${tag}" | wc -w)" -ge 2 ] || printf "%s" "${result}" | grep -q '<tags type="array"/>'; then
       result="0 mixed ${tag}";
       l_search_mode="deep";
@@ -1102,7 +1104,7 @@ init_danbooru() {
   # side effect: do all the stuff
   parser() {
   (
-    tag="$1";
+    tag="${1-}";
     notify 2 "Begining downloading for tag '${tag}'.\n";
     total_count="$(get_count "persist" "${tag}")";
     if [ "${total_count}" -eq 0 ]; then
@@ -1171,7 +1173,7 @@ init_danbooru() {
 
 add_tag_to_db() {
 (
-  tag="$1";
+  tag="${1-}";
   printf "%s\n" "${tag}" >> "${p_db_file}";
 )
 };
@@ -1196,7 +1198,7 @@ actualize() {
     notify 3 "No tags for auto update.\n";
     return 0;
   fi;
-  if [ "$1" != "nocheck" ]; then
+  if [ "${1-}" != "nocheck" ]; then
     content="$(printf "${content}\n" | while read tag; do
       total_count="$(get_count "persist" "${tag}")";
       if [ "${total_count}" -eq 0 ]; then
@@ -1217,18 +1219,23 @@ actualize() {
 )
 };
 
+clean_tmp() {
+(
+  rm -f "${p_temp_dir}/$$-danbooru_grabber_query_result";
+  rm -f "${p_temp_dir}/$$-danbooru_grabber_temp_content_file";
+)
+}
+
 # should do everything that this grabber should
 #
 # args:
 # output:
 # side effect: works sometimes
 main() {
-#  set -x;
-  if [ "$1" = "noadd" ]; then
+  if [ "${1-}" = "noadd" ]; then
     l_noadd="true";
     shift;
   fi;
-  set +f;
   init || { return 1$?; };
   if [ -d "${p_temp_dir}" ]; then
     cd "${p_temp_dir}";
@@ -1287,15 +1294,14 @@ main() {
     ("actualize") actualize; ;;
     ("actualize-no-checks") actualize "nocheck"; ;;
   esac;
+
+  clean_tmp;
+
   return 0;
 )
 };
 
 # main grabber code.
+set -u; # enable strict variable handling
 main "$@";
-exitcode="$?";
-rm -f "${p_temp_dir}/$$-danbooru_grabber_query_result";
-rm -f "${p_temp_dir}/$$-danbooru_grabber_temp_content_file";
-set +f;
-IFS="";
-exit "${exitcode}";
+exit "$?";
