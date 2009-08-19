@@ -1,4 +1,4 @@
-#!/bin/dash
+#!/bin/sh
 
 # Used binaries:
 # sh cat sed grep od wc mv ln rm [ printf touch sleep cut
