@@ -42,7 +42,7 @@
 # output:
 # side effect: defines variables
 init() {
-  g_version="Danbooru v7sh grabber v0.10.16 for Danbooru API v1.13.0";
+  g_version="Danbooru v7sh grabber v0.10.17 for Danbooru API v1.13.0";
 # const
   c_anonymous_tag_limit="2";      # API const
   c_registred_tag_limit="6";      # API const
