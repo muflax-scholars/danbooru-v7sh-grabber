@@ -169,7 +169,11 @@ urlencode() {
 (
   IFS="";
   read -r input;
-  printf "%s" "${input}" | od -t x1 -v | sed 's/^[0-9]*//g;s/[[:space:]]\{1,\}/%/g;s/[%]*$//g;' | while read -r line; do printf "%s" "${line}"; done;
+  printf "%s" "${input}" | od -t x1 -v | 
+    sed 's/^[0-9]*//g;s/[[:space:]]\{1,\}/%/g;s/[%]*$//g;' | 
+    while read -r line; do 
+      printf "%s" "${line}"; 
+    done;
   return 0;
 )
 };
@@ -1306,6 +1310,6 @@ main() {
 };
 
 # main grabber code.
-set -u; # enable strict variable handling
+#set -u; # enable strict variable handling
 main "$@";
 exit "$?";
