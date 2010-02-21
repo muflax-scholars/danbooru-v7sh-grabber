@@ -42,7 +42,7 @@
 # output:
 # side effect: defines variables
 init() {
-  g_version="Danbooru v7sh grabber v0.10.17 for Danbooru API v1.13.0";
+  g_version="Danbooru v7sh grabber v0.10.18 for Danbooru API v1.13.0";
 # const
   c_anonymous_tag_limit="2";      # API const
   c_registred_tag_limit="6";      # API const
@@ -278,6 +278,7 @@ parse_args() {
       ("-n"|"--no-checks") l_validate_values="false"; ;;
       ("-v"|"--verbosity") l_verbose_level="$(printf "%d" "${2-}" 2>/dev/null)"; [ "${2-}" ] && { shift; } ; ;;
       ("-td"|"--tempdir") p_temp_dir="${2-}"; [ "${2-}" ] && { shift; }; ;;
+      ("-e"|"--engine") l_engine="${2-}"; [ "${2-}" ] && { shift; }; ;;
       ("-dm"|"--download-mode") l_download_mode="${2-}"; [ "${2-}" ] && { shift; }; ;;
       ("-dea"|"--download-extensions-allow") l_download_extensions_allow="${2-}"; [ "${2-}" ] && { shift; }; ;;
       ("-ded"|"--download-extensions-deny") l_download_extensions_deny="${2-}"; [ "${2-}" ] && { shift; }; ;;
@@ -292,7 +293,15 @@ parse_args() {
       ("-u"|"--username") s_auth_login="${2-}"; [ "${2-}" ] && { shift; }; ;;
       ("-p"|"--password") tmp_password="${2-}"; arg_tmp_password="true"; [ "${2-}" ] && { shift; }; ;;
       ("-ps"|"--password-salt") s_auth_password_salt="${2-}"; [ "${2-}" ] && { shift; }; ;;
-      ("-url"|"--url") p_danbooru_url="${2-}"; [ "${2-}" ] && { shift; }; ;;
+      ("-url"|"--url") 
+        p_danbooru_url="${2-}"; 
+        [ "${2-}" ] && { shift; }; 
+        case "${p_danbooru_url}" in
+          ("http://gelbooru.com"*)
+            l_engine="gelbooru";
+          ;;
+        esac;
+      ;;
       ("-fd"|"--fail-delay") l_fail_delay="$(printf "%d" "${2-}" 2>/dev/null)"; [ "${2-}" ] && { shift; }; ;;
       (*) s_tags="${s_tags} ${1-}"; arg_s_tags="true"; ;;
     esac;
@@ -943,7 +952,7 @@ export_out() {
     s/file:preview_url/${post_preview_url}/g;
     s/file:sample_url/${post_sample_url}/g;
     s/file:tags/${safe_tags}/g;
-    s/file:md5/${post_md5}/g;
+    s/file:md5/${post_md5post_md5}/g;
     s/file:count/$(printf "%0${#total_count}d" "${count}")/g;
     s/file:id/${post_id}/g;
     s/file:parent_id/${post_parent_id}/g;
@@ -953,6 +962,218 @@ export_out() {
   return 0;
 )
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+init_gelbooru() {
+# should download files and handle download errors
+#
+# args: url local_path
+# output:
+# side effect: saves file to local path
+  get_file() {
+  (
+    persist="false"; 
+    if [ "${1-}" = "persist" ]; then
+      persist="true"; 
+      shift;
+    fi;
+    url="${1-}";
+    local_filepath="${2-}";
+#    url_safe="$(printf "%s" "${url}" | sed 's,/,\\/,g;s,&,\\&,g;')";
+#    safe_filepath="$(printf "%s" "${local_filepath}" | sed 's,/,\\/,g;s,&,\\&,g;')";
+    if [ -e "${local_filepath}" ]; then
+      rm "${local_filepath}";
+    fi;
+    while [ true ]; do
+      while [ true ]; do
+        result="$(downloader "${url}" "${local_filepath}")";
+        case "$?" in
+          (0) break; ;;
+          (1) notify 3 "HTTP ERROR "${result}"\n"; ;;
+          (2) notify 1 "unable to resolve host address '${url}'.\n"; ;;
+        esac;
+        sleep "${l_fail_delay}";
+      done;
+      break;
+    done;
+    return 0;
+  )
+  };
+  
+  # should process api queries, logging in and urlencoding
+  #
+  # args: type params ispersist
+  # output: query_reply
+  # side effect:
+  query() {
+  (
+    echo query;
+    type="${1-}";
+    params="${2-}";
+    persist="${3:-}";
+    case "${type}" in
+      ("post") url="${p_danbooru_url}/index.php?page=dapi&s=post&q=index& "; ;;
+    esac;
+    temp_file="${p_temp_dir}/$$-danbooru_grabber_query_result";
+    IFS=",";
+    for param in ${params}; do
+      IFS=" ";
+      arg="$(printf "%s" "${param}" | sed 's/=.*//g;')";
+      case "${arg}" in
+        ("tags"|"name")
+          out="";
+          for tag in $(printf "%s" "${param}" | sed 's/^[^=]*=//g'); do
+            out="${out}+$(printf "%s" "${tag}" | urlencode)";
+          done;
+          value="$(printf "%s" "${out}" | sed 's/^+//g;')";
+        ;;
+        (*)
+          value="$(printf "%s" "${param}" | sed 's/^[^=]*=//g;' | urlencode)";
+        ;;
+      esac;
+      url="${url}${arg}=${value}&";
+    done;
+    url="$(printf "%s" "${url}" | sed 's/&$//g;')";
+    url="${url}${s_auth_string}";
+    get_file ${persist} "${url}" "${temp_file}";
+    cat "${temp_file}" | sed 's/&amp;/\&/g;';
+    rm -f "${temp_file}";
+  )
+  };
+
+  # should get actual count of specified tag
+  #
+  # args: ispersist tag
+  # output: count
+  # side effect:
+  get_count() {
+  (
+    persist="";
+    if [ "${1-}" = "persist" ]; then
+      persist="${1-}";
+      shift;
+    fi;
+    tag="${1-}";
+    tagcount="$(($(printf "%s" "${tag}" | grep -c " ")+1))";
+    #query "post" "limit=1,pid=1,tags=${tag}" ${persist} 
+    #| sed -n '/<posts/{s/.*count="\([0-9]*\)".*/\1/p;};'
+    result="$(query "post" "limit=1,pid=1,tags=${tag}" ${persist} | sed -n '/<posts/{s/.*count="\([0-9]*\)".*/\1/p;};')";
+    printf "%d" "${result}";
+    return 0;
+  )
+  };
+
+  # should search in tags by given wildcard
+  #
+  # args: wildcard
+  # output:
+  # side effect: print search results
+  search() {
+  (
+    notify 1 "Search is not possible with gelbooru engine\n";
+  )
+  };
+
+  # should parse api data replise
+  #
+  # args: tag
+  # output:
+  # side effect: do all the stuff
+  parser() {
+  (
+    tag="${1-}";
+    notify 2 "Begining downloading for tag '${tag}'.\n";
+    total_count="$(get_count "persist" "${tag}")";
+    if [ "${total_count}" -eq 0 ]; then
+      notify 1 "there is no tag '${tag}'.\n";
+      return 1;
+    fi;
+    if [ "${l_noadd}" != "true" ] && [ "$(grep -c "^[[:space:]]*${tag}[[:space:]]*$" "${p_db_file}")" -eq 0 ]; then
+      add_tag_to_db "${tag}";
+    fi;
+    total_pages="$(((${total_count}/${l_download_page_size})+((${total_count}%${l_download_page_size})&&1)))";
+    page="${l_download_page_offset}";
+    while [ "${page}" -le "${total_pages}" ]; do
+      notify 2 "  Switching to page ${page} of ${total_pages}.\n";
+      count="$((${page}*${l_download_page_size}-${l_download_page_size}+1))";
+      result="$(query "post" "limit=${l_download_page_size},pid=$((${page}-1)),tags=${tag}" "persist" | sed -n '/<post /{p;};')";
+      printf "%s\n" "${result}" | while read -r post; do
+#        echo $post; 
+        post_tags="$(printf "%s" ${post} | sed 's/.*tags="\([^"]*\)".*/\1/g;')";
+        post_created_at="$(printf "%s" ${post} | sed 's/.*created_at="\([^"]*\)".*/\1/g;')";
+        post_height="$(printf "%s" ${post} | sed 's/.*height="\([^"]*\)".*/\1/g;')";
+        post_md5="$(printf "%s" ${post} | sed 's/.*md5="\([^"]*\)".*/\1/g;')";
+        post_file_url="$(printf "%s" ${post} | sed 's/.*file_url="\([^"]*\)".*/\1/g;')";
+        post_preview_url="$(printf "%s" ${post} | sed 's/.*preview_url="\([^"]*\)".*/\1/g;')";
+        post_sample_url="$(printf "%s" ${post} | sed 's/.*sample_url="\([^"]*\)".*/\1/g;')";
+        post_parent_id="$(printf "%s" ${post} | sed 's/.*parent_id="\([^"]*\)".*/\1/g;')";
+        post_id="$(printf "%s" ${post} | sed 's/.*id="\([^"]*\)".*/\1/g;')";
+        post_source="$(printf "%s" ${post} | sed 's/.*source="\([^"]*\)".*/\1/g;')";
+        post_width="$(printf "%s" ${post} | sed 's/.*width="\([^"]*\)".*/\1/g;')";
+        safe_tag="$(printf "%s" "${tag}" | sed 's,[/],,g;s/[[:space:]]\{1,\}/-/g;')";
+        safe_tags="$(printf "%s" ${post_tags} | sed 's,[/],,g;s/[[:space:]]\{1,\}/-/g;s/&/\\&/g;')";
+        post_file_ext="$(printf "%s" "${post_file_url}" | sed 's/.*\.//g')";
+        this_is_allowed="true";
+        IFS=",";
+        if [ "${l_download_extensions_allow}" ]; then
+          this_is_allowed="false";
+          for ext_rule in ${l_download_extensions_allow}; do
+            ext_rule="$(printf "%s" "${ext_rule}" | sed 's/^[[:space:]]*//g;s/[[:space:]]*$//g;')";
+            if [ "${ext_rule}" = "${post_file_ext}" ]; then
+              this_is_allowed="true";
+            fi;
+          done;
+        fi;
+        if [ "${l_download_extensions_deny}" ]; then
+          for ext_rule in ${l_download_extensions_deny}; do
+            ext_rule="$(printf "%s" "${ext_rule}" | sed 's/^[[:space:]]*//g;s/[[:space:]]*$//g;')";
+            if [ "${ext_rule}" = "${post_file_ext}" ]; then
+              this_is_allowed="false";
+            fi;
+          done;
+        fi;
+        if [ "${this_is_allowed}" = "false" ]; then
+          continue;
+        fi;
+        case "${l_download_mode}" in
+          ("export") export_out; ;;
+          (*) download; ;;
+        esac;
+        count="$((${count}+1))";
+      done;
+      page="$((${page}+1))";
+    done;
+    notify 2 "Downloading for tag '${tag}' has been finished.\n";
+    return 0;
+  )
+  };
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # should initialize functions for danbooru parsing
 #
@@ -1271,6 +1492,7 @@ main() {
   esac;
   case "${l_engine}" in
     ("danbooru") init_danbooru; ;;
+    ("gelbooru") init_gelbooru; ;;
   esac;
 (
   if [ "${l_validate_values}" = "true" ]; then
