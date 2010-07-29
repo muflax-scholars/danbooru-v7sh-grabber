@@ -2,6 +2,7 @@
 
 # LICENSE: WTFPLv2
 # Don't trust google! You may do with this shit what the fuck do you want.
+#                                                 (c) by Aleksander Tumin
 
 # Used binaries:
 # sh cat sed grep od wc mv ln rm [ printf touch sleep cut
