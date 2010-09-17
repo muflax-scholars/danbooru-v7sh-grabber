@@ -156,7 +156,8 @@ USAGE: $0 [OPTIONS] <tagA1[ tagA2 ...][, tagB1 ...]>
 					post:width - width of the picture
 					post:tags - tags of the picture
 					post:md5 - md5 of the picture
-					post:id - id of the picture"
+					post:id - id of the picture
+	-dwd	--download-working-directory	Working directory"
 )
 }
 
@@ -170,7 +171,7 @@ PATH="${PATH}:/usr/sfw/bin"
 export PATH
 
 # global
-g_version="Danbooru v7sh grabber v0.20.4 for Danbooru API v1.13.0"
+g_version="Danbooru v7sh grabber v0.20.5 for Danbooru API v1.13.0"
 # strings
 s_tag_list=""
 s_verbose="`get_single_opt "--verbose" "-v" "$@"`"
@@ -199,6 +200,7 @@ p_tempdir="/tmp/danbooru_v7sh_grabber_$$"
 p_temp_query="${p_tempdir}/query"
 p_temp_image="${p_tempdir}/image"
 p_danbooru_url=""
+p_working_directory="./"
 
 if [ ! "${b_downloader}" ]; then
 	log "error" "%s\n" "No suitable downloader found. Consider \
@@ -300,6 +302,10 @@ number: '$2'. Must be a number."
 		;;
 		"-dfn" | "--download-file-name")
 			s_file_name_format="$2"
+			[ ! -z "$2" ] && shift
+		;;
+		"-dwd" | "--download-working-directory")
+			p_working_directory="$2"
 			[ ! -z "$2" ] && shift
 		;;
 		*)
@@ -428,6 +434,11 @@ fi
 if [ ${l_page} -lt 1 ]; then
 	log "error" "%s\n" "Invalid page number: ${l_download_limit}. Must be \
 greater then zero."
+	exit 1
+fi
+
+if [ ! -d "${p_working_directory}" ]; then
+	log "error" "%s\n" "Invalid working directory: ${p_working_directory}"
 	exit 1
 fi
 
@@ -822,7 +833,7 @@ case "${l_mode}" in
 					shift
 					download_dir_name="`printf "%s\n" "${tag_group}" | sed 's/ /-/g;s|/||g;s|\\\||g;'`"
 					mkdir -p "${download_dir_name}"
-					file_path="${download_dir_name}/${file_name}"
+					file_path="${p_working_directory}/${download_dir_name}/${file_name}"
 					if [ -f "${file_path}" ]; then
 						printf "%s\n" "skip"
 						return 0
