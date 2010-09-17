@@ -30,9 +30,6 @@ log() {
 
 get_binary() {
 (
-	# workaround for solaris
-	PATH="${PATH}:/usr/sfw/bin"
-	export PATH
 	for binary in "$@"; do
 		if command -v "${binary}" > /dev/null 2>&1; then
 			printf "%s\n" "${binary}"
@@ -162,8 +159,12 @@ USAGE: $0 [OPTIONS] <tagA1[ tagA2 ...][, tagB1 ...]>
 
 # ################################## Init Section ############################ #
 
+# workaround for solaris
+PATH="${PATH}:/usr/sfw/bin"
+export PATH
+
 # global
-g_version="Danbooru v7sh grabber v0.20.2 for Danbooru API v1.13.0"
+g_version="Danbooru v7sh grabber v0.20.3 for Danbooru API v1.13.0"
 # strings
 s_tag_list=""
 s_verbose="`get_single_opt "--verbose" "-v" "$@"`"
@@ -508,13 +509,15 @@ then one tag is not possible with json interface. Falling back to xml one."
 			}
 			query() {
 			(
+				query_type="$1"
+				shift
 				url_encoded_tags="$1"
 				shift
 				orderby="$1"
 				shift
 				limit="$1"
 				shift
-				if printf "%s" "${url_encoded_tags}" | grep -v '+' > /dev/null; then				
+				if [ "simple" = "${query_type}" ]; then
 					downloader "${p_danbooru_url}/tag/index.${api_interface}?name=${url_encoded_tags}&order=${orderby}&limit=${limit}${login_string}" "${p_temp_query}"
 					printf "\n" >> "${p_temp_query}"
 					cat "${p_temp_query}" | parse | type_format
@@ -777,8 +780,12 @@ case "${l_mode}" in
 			tag_group="$1"
 			shift
 			url_encoded_tags="`tags_urlencode "${tag_group}"`"
+			query_type="simple"
 			log "message" "\t%9s %10s %s\n" "Type" "Count" "Name"
-			query "${url_encoded_tags}" "${l_search_order}" "${l_search_limit}" | 
+			if printf "%s\n" "${tag_group}" | grep '[: ]\{1,\}' >/dev/null; then
+				query_type="deep"
+			fi
+			query "${query_type}" "${url_encoded_tags}" "${l_search_order}" "${l_search_limit}" | 
 			while read line; do
 				set -- ${line}
 				type="$1"
