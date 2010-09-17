@@ -1,6 +1,8 @@
 #!/bin/sh
 # LICENSE: WTFPLv2
-#                                                      (c) by Aleksander Tumin
+#                               (c) Aleksander Tumin <itakingiteasy@gmail.com>
+
+
 # ############################ Core Functions Section ######################## #
 
 log() {
@@ -28,6 +30,9 @@ log() {
 
 get_binary() {
 (
+	# workaround for solaris
+	PATH="${PATH}:/usr/sfw/bin"
+	export PATH
 	for binary in "$@"; do
 		if command -v "${binary}" > /dev/null 2>&1; then
 			printf "%s\n" "${binary}"
@@ -157,12 +162,8 @@ USAGE: $0 [OPTIONS] <tagA1[ tagA2 ...][, tagB1 ...]>
 
 # ################################## Init Section ############################ #
 
-# workaround for solaris
-PATH="${PATH}:/usr/sfw/bin"
-export PATH
-
 # global
-g_version="Danbooru v7sh grabber v0.20.1 for Danbooru API v1.13.0"
+g_version="Danbooru v7sh grabber v0.20.2 for Danbooru API v1.13.0"
 # strings
 s_tag_list=""
 s_verbose="`get_single_opt "--verbose" "-v" "$@"`"
