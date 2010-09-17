@@ -150,7 +150,13 @@ USAGE: $0 [OPTIONS] <tagA1[ tagA2 ...][, tagB1 ...]>
 	-sl	--search-limit		Limit search results. 0 - unlimited
 	-dl	--download-limit	Download page size. Greater then 1
 	-dp	--download-page		Download page offset
-	-dm	--download-mode		Download mode, 'onedir'"
+	-dm	--download-mode		Download mode, 'onedir'
+	-dfn	--download-file-name	Filenaming pattern. Variables are:
+					post:height - height of the picture
+					post:width - width of the picture
+					post:tags - tags of the picture
+					post:md5 - md5 of the picture
+					post:id - id of the picture"
 )
 }
 
@@ -164,7 +170,7 @@ PATH="${PATH}:/usr/sfw/bin"
 export PATH
 
 # global
-g_version="Danbooru v7sh grabber v0.20.3 for Danbooru API v1.13.0"
+g_version="Danbooru v7sh grabber v0.20.4 for Danbooru API v1.13.0"
 # strings
 s_tag_list=""
 s_verbose="`get_single_opt "--verbose" "-v" "$@"`"
@@ -291,6 +297,10 @@ number: '$2'. Must be a number."
 		 "-dm" | "--download-mode")
 			l_download_mode="$2"
 		 	[ ! -z "$2" ] && shift
+		;;
+		"-dfn" | "--download-file-name")
+			s_file_name_format="$2"
+			[ ! -z "$2" ] && shift
 		;;
 		*)
 			s_tag_list="${s_tag_list} $1"
