@@ -22,7 +22,8 @@ log() {
 		"error_part") printf "${format}" "$@" 1>&2; ;;
 		"debug") printf "%s ${format}" "[Debug]" "$@" 1>&2; ;;
 		"debug_part") printf "${format}" "$@" 1>&2; ;;
-		"message") printf "${format}" "$@"; ;;
+		"message") printf "${format}" "$@" 1>&2 ;;
+		"export") printf "${format}" "$@"; ;;
 	esac
 )
 }
@@ -150,7 +151,7 @@ USAGE: $0 [OPTIONS] <tagA1[ tagA2 ...][, tagB1 ...]>
 	-sl	--search-limit		Limit search results. 0 - unlimited
 	-dl	--download-limit	Download page size. Greater then 1
 	-dp	--download-page		Download page offset
-	-dm	--download-mode		Download mode, 'onedir'
+	-dm	--download-mode		Download mode, 'onedir' or 'export'
 	-dfn	--download-file-name	Filenaming pattern. Variables are:
 					post:height - height of the picture
 					post:width - width of the picture
@@ -171,11 +172,11 @@ PATH="${PATH}:/usr/sfw/bin"
 export PATH
 
 # global
-g_version="Danbooru v7sh grabber v0.20.5 for Danbooru API v1.13.0"
+g_version="Danbooru v7sh grabber v0.20.6 for Danbooru API v1.13.0"
 # strings
 s_tag_list=""
 s_verbose="`get_single_opt "--verbose" "-v" "$@"`"
-s_verbose="${s_verbose:-notice message error}"
+s_verbose="${s_verbose:-notice message error export}"
 s_not_found_binaries=""
 s_file_name_format="post:md5"
 s_username=""
@@ -241,9 +242,15 @@ while [ ! -z "$1" ]; do
 			print_help
 			exit 0
 		;;		
-		 "-v" | "--version")
+		 "-V" | "--version")
 			log "message" "%s: %s\n" "$0" "${g_version}"
 			exit 0
+		;;
+		 "-v" | "--verbose")
+		 	[ ! -z "$2" ] && shift
+		;;
+		 "-bd" | "--binary-downloader")
+		 	[ ! -z "$2" ] && shift
 		;;
 		 "-d" | "--download")
 			l_mode="download"
@@ -316,6 +323,8 @@ number: '$2'. Must be a number."
 done
 
 s_tag_list="`printf "%s\n" "${s_tag_list}" | sed 's/^[ ]*//g;s/[ ]*$//g;s/[ ]\{1,\}/ /g;'`"
+
+
 
 # ############################################################################ #
 
@@ -412,9 +421,10 @@ esac
 
 case "${l_download_mode}" in
 	"onedir") ;;
+	"export") ;;
 	*)
 		log "error" "%s\n" "Invalid download mode: \
-'${l_download_mode}'. Must be 'onedir'."
+'${l_download_mode}'. Must be 'onedir' or 'export'."
 		exit 1
 	;;
 esac
@@ -831,6 +841,13 @@ case "${l_mode}" in
 					shift
 					file_name="$1"
 					shift
+					post_number="$1"
+					shift
+					post_count="$1"
+					shift
+					post_count_length="$1"
+					shift
+					log "message" "    Downloading file %s (%0${post_count_length}d/%d)..." "${file_name}" "${post_number}" "${post_count}"
 					download_dir_name="`printf "%s\n" "${tag_group}" | sed 's/ /-/g;s|/||g;s|\\\||g;'`"
 					mkdir -p "${download_dir_name}"
 					file_path="${p_working_directory}/${download_dir_name}/${file_name}"
@@ -840,7 +857,24 @@ case "${l_mode}" in
 					fi
 					downloader "${file_url}" "${p_temp_image}"
 					mv "${p_temp_image}" "${file_path}"
-					printf "%s\n" "done"
+					log "message" "%s\n" "done"
+				)
+				}
+			;;
+			"export")
+				process_files() {
+				(
+					file_url="$1"
+					shift
+					file_name="$1"
+					shift
+					post_number="$1"
+					shift
+					post_count="$1"
+					shift
+					post_count_length="$1"
+					shift
+					log "export" "%s %d %d %d %s	\n" "${file_url}" "${post_number}" "${post_count}" "${post_count_length}" "${file_name}"
 				)
 				}
 			;;
@@ -868,10 +902,7 @@ case "${l_mode}" in
 					shift
 					file_name="`printf "%s\n" "$@" | sed 's|/||g;s|\\\||g;'`"
 					shift	
-					log "message" "    Downloading file %s (%0${post_count_length}d/%d)..." "${file_name}" "${post_number}" "${post_count}"
-
-					result="`process_files "${file_url}" "${file_name}"`"
-					log "message" "%s\n" "${result}"
+					process_files "${file_url}" "${file_name}" "${post_number}" "${post_count}" "${post_count_length}"
 					post_number="`expr "${post_number}" + 1`"
 				done
 				page="`expr "${page}" + 1`"
