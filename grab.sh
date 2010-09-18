@@ -172,7 +172,7 @@ PATH="${PATH}:/usr/sfw/bin"
 export PATH
 
 # global
-g_version="Danbooru v7sh grabber v0.20.6 for Danbooru API v1.13.0"
+g_version="Danbooru v7sh grabber v0.20.7 for Danbooru API v1.13.0"
 # strings
 s_tag_list=""
 s_verbose="`get_single_opt "--verbose" "-v" "$@"`"
@@ -845,8 +845,7 @@ case "${l_mode}" in
 					shift
 					post_count="$1"
 					shift
-					post_count_length="$1"
-					shift
+					post_count_length="`printf "%s" "${post_count}" | wc -c | awk '{print $1}'`"					
 					log "message" "    Downloading file %s (%0${post_count_length}d/%d)..." "${file_name}" "${post_number}" "${post_count}"
 					download_dir_name="`printf "%s\n" "${tag_group}" | sed 's/ /-/g;s|/||g;s|\\\||g;'`"
 					mkdir -p "${download_dir_name}"
@@ -872,9 +871,7 @@ case "${l_mode}" in
 					shift
 					post_count="$1"
 					shift
-					post_count_length="$1"
-					shift
-					log "export" "%s %d %d %d %s	\n" "${file_url}" "${post_number}" "${post_count}" "${post_count_length}" "${file_name}"
+					log "export" "%s %d %d %s\n" "${file_url}" "${post_number}" "${post_count}" "${file_name}"
 				)
 				}
 			;;
@@ -891,7 +888,6 @@ case "${l_mode}" in
 			fi
 			page="${l_page}"
 			log "message" "Starting grabbing for tags '%s'\n" "${tag_group}"
-			post_count_length="`printf "%s" "${post_count}" | wc -c | awk '{print $1}'`"
 			while [ "${page}" -le "${page_count}" ]; do
 				post_number="`expr '(' '(' "${page}" - 1 ')' '*' "${l_download_limit}" ')' + 1`"
 				log "message" "  Switching to page %d of %d\n" "${page}" "${page_count}"
