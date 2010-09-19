@@ -21,7 +21,7 @@ log() {
 		return 1
 	fi
 	case "${type}" in
-		"notice") printf "%s ${f	ormat}" "[Notice]" "$@" 1>&2; ;;
+		"notice") printf "%s ${format}" "[Notice]" "$@" 1>&2; ;;
 		"notice_part") printf -- "${format}" "$@" 1>&2; ;;
 		"error") printf "%s ${format}" "[Error]" "$@" 1>&2; ;;
 		"error_part") printf -- "${format}" "$@" 1>&2; ;;
@@ -177,7 +177,7 @@ PATH="${PATH}:/usr/sfw/bin"
 export PATH
 
 # global
-g_version="Danbooru v7sh grabber v0.20.13 for Danbooru API v1.13.0"
+g_version="Danbooru v7sh grabber v0.20.14 for Danbooru API v1.13.0"
 # strings
 s_tag_list=""
 s_verbose="`get_single_opt "--verbose" "-v" "$@"`"
