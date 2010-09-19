@@ -172,7 +172,7 @@ PATH="${PATH}:/usr/sfw/bin"
 export PATH
 
 # global
-g_version="Danbooru v7sh grabber v0.20.9 for Danbooru API v1.13.0"
+g_version="Danbooru v7sh grabber v0.20.10 for Danbooru API v1.13.0"
 # strings
 s_tag_list=""
 s_verbose="`get_single_opt "--verbose" "-v" "$@"`"
@@ -632,7 +632,7 @@ then one tag is not possible with json interface. Falling back to xml one."
 				shift
 				downloader "${p_danbooru_url}/post/index.xml?tags=${url_encoded_tags}&limit=1${login_string}" "${p_temp_query}"
 				cat -- "${p_temp_query}" | sed -n -- '/^.*<posts count="\([0-9]*\)" offset="[0-9]*">.*$/{s//\1/;p;}'
-				rm  --"${p_temp_query}"
+				rm  -- "${p_temp_query}"
 			)
 			}
 			format_name() {
