@@ -11,17 +11,17 @@ log() {
 	shift
 	format="$1"
 	shift
-	if printf -- "%s\n" "${s_verbose}" | 
-		grep -v -- "`printf -- "%s\n" "${type}" | sed -- 's/_part//'`" >/dev/null; then
+	if printf "%s\n" "${s_verbose}" | 
+		grep -v "`printf "%s\n" "${type}" | sed 's/_part//'`" >/dev/null; then
 		return 1
 	fi
 	case "${type}" in
-		"notice") printf -- "%s ${format}" "[Notice]" "$@" 1>&2; ;;
-		"notice_part") printf -- "${format}" "$@" 1>&2; ;;
-		"error") printf -- "%s ${format}" "[Error]" "$@" 1>&2; ;;
-		"error_part") printf -- "${format}" "$@" 1>&2; ;;
-		"debug") printf -- "%s ${format}" "[Debug]" "$@" 1>&2; ;;
-		"debug_part") printf -- "${format}" "$@" 1>&2; ;;
+		"notice") printf "%s ${format}" "[Notice]" "$@" 1>&2; ;;
+		"notice_part") printf "${format}" "$@" 1>&2; ;;
+		"error") printf "%s ${format}" "[Error]" "$@" 1>&2; ;;
+		"error_part") printf "${format}" "$@" 1>&2; ;;
+		"debug") printf "%s ${format}" "[Debug]" "$@" 1>&2; ;;
+		"debug_part") printf "${format}" "$@" 1>&2; ;;
 		"message") printf -- "${format}" "$@" 1>&2 ;;
 		"export") printf -- "${format}" "$@"; ;;
 	esac
@@ -32,8 +32,8 @@ log() {
 get_binary() {
 (
 	for binary in "$@"; do
-		if command -v "${binary}" > /dev/null 2>&1; then
-			printf -- "%s\n" "${binary}"
+		if command -v -- "${binary}" > /dev/null 2>&1; then
+			printf "%s\n" "${binary}"
 			break
 		fi
 	done
@@ -55,7 +55,7 @@ get_single_opt() {
 		if [ "false" = "${tmp_is_argument}" ]; then
 			continue
 		fi
-		printf -- "%s\n" "${opt}"
+		printf "%s\n" "${opt}"
 		break
 	done
 )
@@ -77,9 +77,9 @@ downloader() {
 	shift
 	local_file="$1"
 	shift
-	url_host="`printf -- "%s\n" "${remote_file_url}" | sed -- 's|^.*://||;s|/.*||'`"
-	url_path="`printf -- "%s\n" "${remote_file_url}" | sed -- 's/:[0-9]*$//;s|.*://[^/]*[/]\{0,1\}$|/|'`"
-	url_port="`printf -- "%s\n" "${remote_file_url}" | sed -n -- 's/.*:\([0-9]*\)$/\1/p'`"
+	url_host="`printf "%s\n" "${remote_file_url}" | sed 's|^.*://||;s|/.*||'`"
+	url_path="`printf "%s\n" "${remote_file_url}" | sed 's/:[0-9]*$//;s|.*://[^/]*[/]\{0,1\}$|/|'`"
+	url_port="`printf "%s\n" "${remote_file_url}" | sed -n 's/.*:\([0-9]*\)$/\1/p'`"
 	url_port="${url_port:-80}"
 
 	case "${b_downloader}" in
@@ -87,13 +87,13 @@ downloader() {
 			wget -q -c "${remote_file_url}" -O "${local_file}"
 		;;
 		*"curl")
-			curl "${remote_file_url}" -s -C - -o "${local_file}"
+			curl -s -C - -o "${local_file}" -- "${remote_file_url}"
 		;;
 		*"axel")
-			axel -q -o "${local_file}" "${remote_file_url}"
+			axel -q -o "${local_file}" -- "${remote_file_url}"
 		;;
 		*"fetch")
-			fetch -m -o- "${remote_file_url}" > "${local_file}" 2>/dev/null
+			fetch -m -o- -- "${remote_file_url}" > "${local_file}" 2>/dev/null
 		;;
 	esac
 )
@@ -102,13 +102,13 @@ downloader() {
 urlencode() {
 (
 	input="$@"
-	printf -- "%s" "${input}" | 
-		od -t x1 -v -- | 
-		sed -- 's/^[0-9]*//g;s/[ ]\{1,\}/%/g;s/[%]*$//g;' | 
+	printf "%s" "${input}" | 
+		od -t x1 -v | 
+		sed 's/^[0-9]*//g;s/[ ]\{1,\}/%/g;s/[%]*$//g;' | 
 		while read line; do 
-			printf -- "%s" "${line}";
+			printf "%s" "${line}";
 		done
-		printf -- "\n"
+		printf "\n"
 )
 }
 
@@ -122,7 +122,7 @@ tags_urlencode() {
 		encoded_tag="`urlencode "${tag}"`"
 		out="${out}+${encoded_tag}"
 	done
-	printf -- "%s\n" "${out}" | sed -- 's/^+//'
+	printf "%s\n" "${out}" | sed 's/^+//'
 )
 }
 
@@ -130,7 +130,7 @@ password_hash() {
 (
 	password="$1"
 	shift
-	printf -- "${password}" | "${b_hasher}" | awk -- '{print $1}'
+	printf -- "${password}" | "${b_hasher}" | awk '{print $1}'
 )
 }
 
@@ -172,7 +172,7 @@ PATH="${PATH}:/usr/sfw/bin"
 export PATH
 
 # global
-g_version="Danbooru v7sh grabber v0.20.10 for Danbooru API v1.13.0"
+g_version="Danbooru v7sh grabber v0.20.11 for Danbooru API v1.13.0"
 # strings
 s_tag_list=""
 s_verbose="`get_single_opt "--verbose" "-v" "$@"`"
@@ -190,7 +190,7 @@ l_search_limit="0"
 l_download_limit="100"
 l_download_mode="onedir" # currentdir, many
 l_page="1"
-l_used_binaries_list="[ printf cat grep sed od dd awk rm wc expr"
+l_used_binaries_list="[ printf cat grep sed od dd awk"
 l_supported_downloaders_list="`get_single_opt "--binary-downloader" "-bd" "$@"` wget curl axel fetch"
 l_supported_sha1_hashers_list="sha1 sha1sum"
 #binaries
@@ -206,7 +206,7 @@ p_working_directory="./"
 if [ ! "${b_downloader}" ]; then
 	log "error" "%s\n" "No suitable downloader found. Consider \
 putting to your PATH directories one of folowing binaries: \
-`printf -- "%s\n" ${l_supported_downloaders_list} | tr ' ' '\n' | sort -u | tr '\n' ' '`"
+`printf "%s\n" ${l_supported_downloaders_list} | tr ' ' '\n' | sort -u | tr '\n' ' '`"
 	exit 1
 fi
 
@@ -280,7 +280,7 @@ while [ ! -z "$1" ]; do
 		 	[ ! -z "$2" ] && shift
 		;;
 		 "-sl" | "--search-limit")
-			l_search_limit=`printf -- "%d\n" $2` || {
+			l_search_limit=`printf "%d\n" $2` || {
 				log "error" "%s\n" "Invalid search limit: \
 '$2'. Must be a number."
 				exit 1
@@ -288,7 +288,7 @@ while [ ! -z "$1" ]; do
 		 	[ ! -z "$2" ] && shift
 		;;
 		 "-dl" | "--download-limit")
-			l_download_limit=`printf -- "%d\n" $2` || {
+			l_download_limit=`printf "%d\n" $2` || {
 				log "error" "%s\n" "Invalid download limit: \
 '$2'. Must be a number."
 				exit 1
@@ -296,7 +296,7 @@ while [ ! -z "$1" ]; do
 		 	[ ! -z "$2" ] && shift
 		;;
 		 "-dp" | "--download-page")
-			l_page=`printf -- "%d\n" $2` || {
+			l_page=`printf "%d\n" $2` || {
 				log "error" "%s\n" "Invalid starting page \
 number: '$2'. Must be a number."
 				exit 1
@@ -322,7 +322,7 @@ number: '$2'. Must be a number."
 	shift
 done
 
-s_tag_list="`printf -- "%s\n" "${s_tag_list}" | sed -- 's/^[ ]*//g;s/[ ]*$//g;s/[ ]\{1,\}/ /g;'`"
+s_tag_list="`printf "%s\n" "${s_tag_list}" | sed 's/^[ ]*//g;s/[ ]*$//g;s/[ ]\{1,\}/ /g;'`"
 
 
 
@@ -351,7 +351,7 @@ case "${l_engine}" in
 		if [ -z "${s_username}" ]; then
 			IFS=","
 			for tag_group in ${s_tag_list}; do
-				if [ `printf -- "%s\n" "${tag_group}" | wc -w -- | awk -- '{print $1}'` -gt ${c_anonymous_tag_limit} ]; then
+				if [ `printf "%s\n" "${tag_group}" | wc -w | awk '{print $1}'` -gt ${c_anonymous_tag_limit} ]; then
 					log "error" "%s\n" "You can't download more \
 then two tags anonymously with danbooru engine."
 				exit 1
@@ -367,7 +367,7 @@ binaries: ${l_supported_sha1_hashers_list}"
 			fi
 			IFS=","
 			for tag_group in ${s_tag_list}; do
-				if [ `printf -- "%s\n" "${tag_group}" | wc -w -- | awk -- '{print $1}'` -gt ${c_registred_tag_limit} ]; then
+				if [ `printf "%s\n" "${tag_group}" | wc -w | awk '{print $1}'` -gt ${c_registred_tag_limit} ]; then
 					log "error" "%s\n" "You can't download more \
 then six tags with danbooru engine."
 				exit 1
@@ -473,15 +473,15 @@ engine_danbooru() {
 				"xml")
 					parse() {
 					(
-						cat -- | grep -- '<tag ' | while read line; do
-							printf -- "%s\n" "${line}" | 
-							sed --  's/.*type="\([0-9]*\)".*/\1/g;' | 
+						cat | grep '<tag ' | while read line; do
+							printf "%s\n" "${line}" | 
+							sed  's/.*type="\([0-9]*\)".*/\1/g;' | 
 							tr '\n' ' '
-							printf -- "%s\n" "${line}" | 
-							sed --  's/.*count="\([0-9]*\)".*/\1/g;' | 
+							printf "%s\n" "${line}" | 
+							sed  's/.*count="\([0-9]*\)".*/\1/g;' | 
 							tr '\n' ' '
-							printf -- "%s\n" "${line}" | 
-							sed -- 's/.*name=\"\([^\"]*\)\".*/\1/g;'
+							printf "%s\n" "${line}" | 
+							sed  's/.*name=\"\([^\"]*\)\".*/\1/g;'
 						done
 					)
 					}
@@ -489,14 +489,14 @@ engine_danbooru() {
 					(
 						name="$1"
 						shift
-						out=`cat -- | 
-						sed -n -- '/^.*<posts[^<]*count="\([0-9]*\)"[^>]*>.*$/{
+						out=`cat | 
+						sed -n '/^.*<posts[^<]*count="\([0-9]*\)"[^>]*>.*$/{
 							s//mixed \1 /;
 							p;
 							}'`
 						if [ ! -z "${out}" ]; then
-							printf -- "%s" "${out}"
-							printf -- "%s\n" "${name}"
+							printf "%s" "${out}"
+							printf "%s\n" "${name}"
 						fi
 					)
 					}
@@ -504,20 +504,20 @@ engine_danbooru() {
 				"json")
 					parse() {
 					(
-						cat -- |
-						sed -- 's/^\[{//g;s/}\]$//g;' |
-						sed -- 's/},{/\
+						cat |
+						sed 's/^\[{//g;s/}\]$//g;' |
+						sed 's/},{/\
 /g;/^\[\]$/d'					| while read line; do
-							printf -- "%s\n" "${line}" | 
-							sed -- 's/.*"type":\([0-9]*\).*/\1/g;' | 
+							printf "%s\n" "${line}" | 
+							sed 's/.*"type":\([0-9]*\).*/\1/g;' | 
 							tr '\n' ' '
 					
-							printf -- "%s\n" "${line}" | 
-							sed -- 's/.*"count":\([0-9]*\).*/\1/g;' | 
+							printf "%s\n" "${line}" | 
+							sed 's/.*"count":\([0-9]*\).*/\1/g;' | 
 							tr '\n' ' '
 					
-							printf -- "%s\n" "${line}"   |
-							sed -- 's/.*"name":"\([^,]*\)".*/\1/g;'
+							printf "%s\n" "${line}"   |
+							sed 's/.*"name":"\([^,]*\)".*/\1/g;'
 						done
 					)
 					}
@@ -531,8 +531,8 @@ then one tag is not possible with json interface. Falling back to xml one."
 				;;
 			esac
 			type_format() {
-				cat -- | 
-				sed -- 's/^0/general/;
+				cat | 
+				sed '	s/^0/general/;
 					s/^1/artist/;
 					s/^2/unknown/;
 					s/^3/copyright/;
@@ -550,7 +550,7 @@ then one tag is not possible with json interface. Falling back to xml one."
 				shift
 				if [ "simple" = "${query_type}" ]; then
 					downloader "${p_danbooru_url}/tag/index.${api_interface}?name=${url_encoded_tags}&order=${orderby}&limit=${limit}${login_string}" "${p_temp_query}"
-					printf -- "\n" >> "${p_temp_query}"
+					printf "\n" >> "${p_temp_query}"
 					cat -- "${p_temp_query}" | parse | type_format
 					rm -- "${p_temp_query}"
 				else
@@ -562,7 +562,7 @@ then one tag is not possible with json interface. Falling back to xml one."
 						engine_danbooru "search" "xml"
 						query "${url_encoded_tags}" "${orderby}" "${limit}"
 					else
-						 printf -- "%s\n" "${out}" | type_format
+						 printf "%s\n" "${out}" | type_format
 					fi
 				fi
 			)
@@ -573,25 +573,25 @@ then one tag is not possible with json interface. Falling back to xml one."
 				"xml")
 					parse() {
 					(
-						cat -- | sed -n -- '/.*<post [ ]*/{s///;s|/>$||;p;}' |
+						cat | sed -n '/.*<post [ ]*/{s///;s|/>$||;p;}' |
 						while read line; do
-							post_rating="`printf -- "%s\n" "${line}" | 
-							sed -- 's/.*rating=\"\([^\"]*\)\".*/\1/g;
+							post_rating="`printf "%s\n" "${line}" | 
+							sed 's/.*rating=\"\([^\"]*\)\".*/\1/g;
 							s/e/explicit/g;s/s/safe/g;
 							s/q/questionable/g;'`"
-							post_height="`printf -- "%s\n" "${line}" | 
-							sed -- 's/.*height=\"\([^\"]*\)\".*/\1/g;'`"
-							post_width="`printf -- "%s\n" "${line}" | 
-							sed -- 's/.*width=\"\([^\"]*\)\".*/\1/g;'`"
-							post_tags="`printf -- "%s\n" "${line}" | 
-							sed -- 's/.*tags=\"\([^\"]*\)\".*/\1/g;s/ /-/g;' | dd -- bs=250 count=1 -- 2>/dev/null`"
-							post_md5="`printf -- "%s\n" "${line}" | 
-							sed -- 's/.*md5=\"\([^\"]*\)\".*/\1/g;'`"
-							post_url="`printf -- "%s\n" "${line}" | 
-							sed -- 's/.*file_url=\"\([^\"]*\)\".*/\1/g;'`"
-							post_id="`printf -- "%s\n" "${line}" | 
-							sed -- 's/.*id=\"\([^\"]*\)\".*/\1/g;'`"
-							format_name | sed -- 's/&gt;/>/g;
+							post_height="`printf "%s\n" "${line}" | 
+							sed 's/.*height=\"\([^\"]*\)\".*/\1/g;'`"
+							post_width="`printf "%s\n" "${line}" | 
+							sed 's/.*width=\"\([^\"]*\)\".*/\1/g;'`"
+							post_tags="`printf "%s\n" "${line}" | 
+							sed 's/.*tags=\"\([^\"]*\)\".*/\1/g;s/ /-/g;' | dd bs=250 count=1 2>/dev/null`"
+							post_md5="`printf "%s\n" "${line}" | 
+							sed 's/.*md5=\"\([^\"]*\)\".*/\1/g;'`"
+							post_url="`printf "%s\n" "${line}" | 
+							sed 's/.*file_url=\"\([^\"]*\)\".*/\1/g;'`"
+							post_id="`printf "%s\n" "${line}" | 
+							sed 's/.*id=\"\([^\"]*\)\".*/\1/g;'`"
+							format_name | sed 's/&gt;/>/g;
 							s/&lt;/</g;s/&quot;/"/g;s/&amp;/\&/g;'
 						done
 					)
@@ -600,27 +600,27 @@ then one tag is not possible with json interface. Falling back to xml one."
 				"json")
 					parse() {
 					(
-						cat -- |
-						sed -- 's/^\[{//g;s/}\]$//g;' |
-						sed -- 's/},{/\
+						cat |
+						sed 's/^\[{//g;s/}\]$//g;' |
+						sed 's/},{/\
 /g;/^\[\]$/d'					| while read line; do
-							post_rating="`printf -- "%s\n" "${line}" | 
-							sed -- 's/.*\"rating\":\"\([^\"]*\)\".*/\1/g;
+							post_rating="`printf "%s\n" "${line}" | 
+							sed 's/.*\"rating\":\"\([^\"]*\)\".*/\1/g;
 							s/e/explicit/g;s/s/safe/g;
 							s/q/questionable/g;'`"
-							post_height="`printf -- "%s\n" "${line}" |
-							sed -- 's/.*\"height\":\([0-9]*\).*/\1/g'`"
-							post_width="`printf -- "%s\n" "${line}" |
-							sed -- 's/.*\"width\":\([0-9]*\).*/\1/g'`"
-							post_tags="`printf -- "%s\n" "${line}" | 
-							sed -- 's/.*\"tags\":\"\([^,]*\)\".*/\1/g' | dd -- bs=250 count=1 2>/dev/null`"
-							post_md5="`printf -- "%s\n" "${line}" | 
-							sed -- 's/.*\"md5\":\"\([0-9a-z]*\)\".*/\1/g;'`"
-							post_url="`printf -- "%s\n" "${line}" |
-							sed -- 's/.*\"file_url\":\"\([^,]*\)\".*/\1/g'`"
-							post_id="`printf -- "%s\n" "${line}" |
-							sed -- 's/.*\"id\":\([0-9]*\).*/\1/g'`"
-							format_name | sed -- 's/u003E/>/g;s/u003C/</g;s/u0026/\&/g;'
+							post_height="`printf "%s\n" "${line}" |
+							sed 's/.*\"height\":\([0-9]*\).*/\1/g'`"
+							post_width="`printf "%s\n" "${line}" |
+							sed 's/.*\"width\":\([0-9]*\).*/\1/g'`"
+							post_tags="`printf "%s\n" "${line}" | 
+							sed 's/.*\"tags\":\"\([^,]*\)\".*/\1/g' | dd bs=250 count=1 2>/dev/null`"
+							post_md5="`printf "%s\n" "${line}" | 
+							sed 's/.*\"md5\":\"\([0-9a-z]*\)\".*/\1/g;'`"
+							post_url="`printf "%s\n" "${line}" |
+							sed 's/.*\"file_url\":\"\([^,]*\)\".*/\1/g'`"
+							post_id="`printf "%s\n" "${line}" |
+							sed 's/.*\"id\":\([0-9]*\).*/\1/g'`"
+							format_name | sed 's/u003E/>/g;s/u003C/</g;s/u0026/\&/g;'
 						done
 					)
 					}
@@ -631,30 +631,30 @@ then one tag is not possible with json interface. Falling back to xml one."
 				url_encoded_tags="$1"
 				shift
 				downloader "${p_danbooru_url}/post/index.xml?tags=${url_encoded_tags}&limit=1${login_string}" "${p_temp_query}"
-				cat -- "${p_temp_query}" | sed -n -- '/^.*<posts count="\([0-9]*\)" offset="[0-9]*">.*$/{s//\1/;p;}'
-				rm  -- "${p_temp_query}"
+				cat -- "${p_temp_query}" | sed -n '/^.*<posts count="\([0-9]*\)" offset="[0-9]*">.*$/{s//\1/;p;}'
+				rm -- "${p_temp_query}"
 			)
 			}
 			format_name() {
 			(
-				post_ext="`printf -- "%s\n" "${post_url}" | 
-				sed -- 's/.*\(\.[^.]*\)$/\1/;'`"
-				post_ext_length="`printf -- "%s" "${post_ext}" | 
-				wc -c -- | awk -- '{print $1}'`"
-				name_length="`expr -- 250 - "${post_ext_length}"`"
+				post_ext="`printf "%s\n" "${post_url}" | 
+				sed 's/.*\(\.[^.]*\)$/\1/;'`"
+				post_ext_length="`printf "%s" "${post_ext}" | 
+				wc -c | awk '{print $1}'`"
+				name_length="`expr 250 - "${post_ext_length}"`"
 
 				# no "" !
-				sed_string=`printf -- "%s\n" "s,post:rating,${post_rating},g;
+				sed_string=`printf "%s\n" "s,post:rating,${post_rating},g;
 				s,post:height,${post_height},g;
 				s,post:width,${post_width},g;
 				s,post:tags,${post_tags},g;
 				s,post:md5,${post_md5},g;
-				s,post:id,${post_id},g;" | sed -- 's/&/\\\&/g;'`
+				s,post:id,${post_id},g;" | sed 's/&/\\\&/g;'`
 
-				name="`printf -- "%s\n" "${s_file_name_format}" | 
+				name="`printf "%s\n" "${s_file_name_format}" | 
 				sed -- "${sed_string}" |
-				dd -- bs="${name_length}" count=1 2>/dev/null`"
-				printf -- "%s %s\n" "${post_url}" "${name}${post_ext}"
+				dd bs="${name_length}" count=1 2>/dev/null`"
+				printf "%s %s\n" "${post_url}" "${name}${post_ext}"
 			)
 			}
 			query() {
@@ -666,7 +666,7 @@ then one tag is not possible with json interface. Falling back to xml one."
 				limit="$1"
 				shift
 				downloader "${p_danbooru_url}/post/index.${api_interface}?tags=${url_encoded_tags}&page=${page}&limit=${limit}${login_string}" "${p_temp_query}"
-				printf -- "\n" >> "${p_temp_query}"
+				printf "\n" >> "${p_temp_query}"
 				cat -- "${p_temp_query}" | parse
 				rm -- "${p_temp_query}"
 			)
@@ -693,14 +693,14 @@ engine_gelbooru() {
 					(
 						name="$1"
 						shift
-						out="`cat -- | 
-						sed -n -- '/^.*<posts[^<]*count="\([0-9]*\)"[^>]*>.*$/{
+						out="`cat | 
+						sed -n '/^.*<posts[^<]*count="\([0-9]*\)"[^>]*>.*$/{
 							s//mixed \1 /;
 							p;
 							}'`"
 						if [ ! -z "${out}" ]; then
-							printf -- "%s" "${out}"
-							printf -- "%s\n" "${name}"
+							printf "%s" "${out}"
+							printf "%s\n" "${name}"
 						fi
 					)
 					}
@@ -714,7 +714,7 @@ engine_gelbooru() {
 				limit="$1"
 				shift
 				downloader "${p_danbooru_url}/index.php?page=dapi&s=post&q=index&tags=${url_encoded_tags}&limit=${limit}" "${p_temp_query}"
-				printf -- "\n" >> "${p_temp_query}"
+				printf "\n" >> "${p_temp_query}"
 				cat -- "${p_temp_query}" | parse_deep "${tag_group}"
 				rm -- "${p_temp_query}" 
 			}
@@ -724,25 +724,25 @@ engine_gelbooru() {
 				"xml")
 					parse() {
 					(
-						cat -- | sed -n -- '/.*<post [ ]*/{s///;s|/>$||;p;}' |
+						cat | sed -n '/.*<post [ ]*/{s///;s|/>$||;p;}' |
 						while read line; do
-							post_rating="`printf -- "%s\n" "${line}" | 
-							sed -- 's/.*rating=\"\([^\"]*\)\".*/\1/g;
+							post_rating="`printf "%s\n" "${line}" | 
+							sed 's/.*rating=\"\([^\"]*\)\".*/\1/g;
 							s/e/explicit/g;s/s/safe/g;
 							s/q/questionable/g;'`"
-							post_height="`printf -- "%s\n" "${line}" | 
-							sed -- 's/.*height=\"\([^\"]*\)\".*/\1/g;'`"
-							post_width="`printf -- "%s\n" "${line}" | 
-							sed -- 's/.*width=\"\([^\"]*\)\".*/\1/g;'`"
-							post_tags="`printf -- "%s\n" "${line}" | 
-							sed -- 's/.*tags=\"\([^\"]*\)\".*/\1/g;s/ /-/g;' | dd -- bs=250 count=1 2>/dev/null`"
-							post_md5="`printf -- "%s\n" "${line}" | 
-							sed -- 's/.*md5=\"\([^\"]*\)\".*/\1/g;'`"
-							post_url="`printf -- "%s\n" "${line}" | 
-							sed -- 's/.*file_url=\"\([^\"]*\)\".*/\1/g;'`"
-							post_id="`printf -- "%s\n" "${line}" | 
-							sed -- 's/.*id=\"\([^\"]*\)\".*/\1/g;'`"
-							format_name | sed -- 's/&gt;/>/g;
+							post_height="`printf "%s\n" "${line}" | 
+							sed 's/.*height=\"\([^\"]*\)\".*/\1/g;'`"
+							post_width="`printf "%s\n" "${line}" | 
+							sed 's/.*width=\"\([^\"]*\)\".*/\1/g;'`"
+							post_tags="`printf "%s\n" "${line}" | 
+							sed 's/.*tags=\"\([^\"]*\)\".*/\1/g;s/ /-/g;' | dd bs=250 count=1 2>/dev/null`"
+							post_md5="`printf "%s\n" "${line}" | 
+							sed 's/.*md5=\"\([^\"]*\)\".*/\1/g;'`"
+							post_url="`printf "%s\n" "${line}" | 
+							sed 's/.*file_url=\"\([^\"]*\)\".*/\1/g;'`"
+							post_id="`printf "%s\n" "${line}" | 
+							sed 's/.*id=\"\([^\"]*\)\".*/\1/g;'`"
+							format_name | sed 's/&gt;/>/g;
 							s/&lt;/</g;s/&quot;/"/g;s/&amp;/\&/g;'
 
 						done
@@ -755,30 +755,30 @@ engine_gelbooru() {
 				url_encoded_tags="$1"
 				shift
 				downloader "${p_danbooru_url}/index.php?page=dapi&s=post&q=index&tags=${url_encoded_tags}&limit=1" "${p_temp_query}"
-				cat -- "${p_temp_query}" | sed -n -- '/^.*<posts count="\([0-9]*\)" offset="[0-9]*">.*$/{s//\1/;p;}'
+				cat -- "${p_temp_query}" | sed -n '/^.*<posts count="\([0-9]*\)" offset="[0-9]*">.*$/{s//\1/;p;}'
 				rm -- "${p_temp_query}"
 			)
 			}
 			format_name() {
 			(
-				post_ext="`printf -- "%s\n" "${post_url}" | 
-				sed -- 's/.*\(\.[^.]*\)$/\1/;'`"
-				post_ext_length="`printf -- "%s" "${post_ext}" | 
-				wc -c -- | awk -- '{print $1}'`"
-				name_length="`expr -- 250 - "${post_ext_length}"`"
+				post_ext="`printf "%s\n" "${post_url}" | 
+				sed 's/.*\(\.[^.]*\)$/\1/;'`"
+				post_ext_length="`printf "%s" "${post_ext}" | 
+				wc -c | awk '{print $1}'`"
+				name_length="`expr 250 - "${post_ext_length}"`"
 
 				# no "" !
-				sed_string=`printf -- "%s\n" "s,post:rating,${post_rating},g;
+				sed_string=`printf "%s\n" "s,post:rating,${post_rating},g;
 				s,post:height,${post_height},g;
 				s,post:width,${post_width},g;
 				s,post:tags,${post_tags},g;
 				s,post:md5,${post_md5},g;
-				s,post:id,${post_id},g;" | sed -- 's/&/\\\&/g;'`
+				s,post:id,${post_id},g;" | sed 's/&/\\\&/g;'`
 
-				name="`printf -- "%s\n" "${s_file_name_format}" | 
+				name="`printf "%s\n" "${s_file_name_format}" | 
 				sed -- "${sed_string}" |
-				dd -- bs="${name_length}" count=1 2>/dev/null`"
-				printf -- "%s %s\n" "${post_url}" "${name}${post_ext}"
+				dd bs="${name_length}" count=1 2>/dev/null`"
+				printf "%s %s\n" "${post_url}" "${name}${post_ext}"
 			)
 			}
 			query() {
@@ -790,7 +790,7 @@ engine_gelbooru() {
 				limit="$1"
 				shift
 				downloader "${p_danbooru_url}/index.php?page=dapi&s=post&q=index&tags=${url_encoded_tags}&limit=${limit}" "${p_temp_query}"
-				printf -- "\n" >> "${p_temp_query}"
+				printf "\n" >> "${p_temp_query}"
 				cat -- "${p_temp_query}" | parse
 				rm -- "${p_temp_query}"
 			)
@@ -813,7 +813,7 @@ case "${l_mode}" in
 			url_encoded_tags="`tags_urlencode "${tag_group}"`"
 			query_type="simple"
 			log "message" "\t%9s %10s %s\n" "Type" "Count" "Name"
-			if printf -- "%s\n" "${tag_group}" | grep -- '[: ]\{1,\}' >/dev/null; then
+			if printf "%s\n" "${tag_group}" | grep '[: ]\{1,\}' >/dev/null; then
 				query_type="deep"
 			fi
 			query "${query_type}" "${url_encoded_tags}" "${l_search_order}" "${l_search_limit}" | 
@@ -845,17 +845,17 @@ case "${l_mode}" in
 					shift
 					post_count="$1"
 					shift
-					post_count_length="`printf -- "%s" "${post_count}" | wc -c -- | awk -- '{print $1}'`"					
+					post_count_length="`printf "%s" "${post_count}" | wc -c | awk '{print $1}'`"					
 					log "message" "    Downloading file %s (%0${post_count_length}d/%d)..." "${file_name}" "${post_number}" "${post_count}"
-					download_dir_name="`printf -- "%s\n" "${tag_group}" | sed -- 's/ /-/g;s|/||g;s|\\\||g;'`"
-					mkdir -p "${download_dir_name}"
+					download_dir_name="`printf "%s\n" "${tag_group}" | sed 's/ /-/g;s|/||g;s|\\\||g;'`"
+					mkdir -p -- "${download_dir_name}"
 					file_path="${p_working_directory}/${download_dir_name}/${file_name}"
 					if [ -f "${file_path}" ]; then
-						printf -- "%s\n" "skip"
+						printf "%s\n" "skip"
 						return 0
 					fi
 					downloader "${file_url}" "${p_temp_image}"
-					mv "${p_temp_image}" "${file_path}"
+					mv -- "${p_temp_image}" "${file_path}"
 					log "message" "%s\n" "done"
 				)
 				}
@@ -882,26 +882,26 @@ case "${l_mode}" in
 			shift
 			url_encoded_tags="`tags_urlencode "${tag_group}"`"
 			post_count="`get_count "${url_encoded_tags}"`"
-			page_count="`expr -- "${post_count}" / "${l_download_limit}"`"
-			if [ 0 -ne "`expr -- "${post_count}" % "${l_download_limit}"`" ]; then
-				page_count="`expr -- "${page_count}" + 1`"
+			page_count="`expr "${post_count}" / "${l_download_limit}"`"
+			if [ 0 -ne "`expr "${post_count}" % "${l_download_limit}"`" ]; then
+				page_count="`expr "${page_count}" + 1`"
 			fi
 			page="${l_page}"
 			log "message" "Starting grabbing for tags '%s'\n" "${tag_group}"
 			while [ "${page}" -le "${page_count}" ]; do
-				post_number="`expr -- '(' '(' "${page}" - 1 ')' '*' "${l_download_limit}" ')' + 1`"
+				post_number="`expr '(' '(' "${page}" - 1 ')' '*' "${l_download_limit}" ')' + 1`"
 				log "message" "  Switching to page %d of %d\n" "${page}" "${page_count}"
 				query "${url_encoded_tags}" "${page}" "${l_download_limit}" |
 				while read line; do
 					set -- ${line}
 					file_url="$1"
 					shift
-					file_name="`printf -- "%s\n" "$@" | sed -- 's|/||g;s|\\\||g;'`"
+					file_name="`printf "%s\n" "$@" | sed 's|/||g;s|\\\||g;'`"
 					shift	
 					process_files "${file_url}" "${file_name}" "${post_number}" "${post_count}" "${post_count_length}"
-					post_number="`expr -- "${post_number}" + 1`"
+					post_number="`expr "${post_number}" + 1`"
 				done
-				page="`expr -- "${page}" + 1`"
+				page="`expr "${page}" + 1`"
 			done
 			log "message" "End grabbing for tags '%s'\n" "${tag_group}"
 		)
