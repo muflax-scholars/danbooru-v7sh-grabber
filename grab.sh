@@ -3,6 +3,11 @@
 #                               (c) Aleksander Tumin <itakingiteasy@gmail.com>
 
 
+# i use `` instead of $() because solaris does not support $()'s
+
+# i also used some thing only because only it was compatible with solaris, but
+# i forgot which one
+
 # ############################ Core Functions Section ######################## #
 
 log() {
@@ -16,7 +21,7 @@ log() {
 		return 1
 	fi
 	case "${type}" in
-		"notice") printf "%s ${format}" "[Notice]" "$@" 1>&2; ;;
+		"notice") printf "%s ${f	ormat}" "[Notice]" "$@" 1>&2; ;;
 		"notice_part") printf -- "${format}" "$@" 1>&2; ;;
 		"error") printf "%s ${format}" "[Error]" "$@" 1>&2; ;;
 		"error_part") printf -- "${format}" "$@" 1>&2; ;;
@@ -172,7 +177,7 @@ PATH="${PATH}:/usr/sfw/bin"
 export PATH
 
 # global
-g_version="Danbooru v7sh grabber v0.20.12 for Danbooru API v1.13.0"
+g_version="Danbooru v7sh grabber v0.20.13 for Danbooru API v1.13.0"
 # strings
 s_tag_list=""
 s_verbose="`get_single_opt "--verbose" "-v" "$@"`"
@@ -473,7 +478,7 @@ engine_danbooru() {
 				"xml")
 					parse() {
 					(
-						cat | grep '<tag ' | while read line; do
+						grep '<tag ' | while read line; do
 							printf "%s\n" "${line}" | 
 							sed  's/.*type="\([0-9]*\)".*/\1/g;' | 
 							tr '\n' ' '
@@ -489,8 +494,7 @@ engine_danbooru() {
 					(
 						name="$1"
 						shift
-						out=`cat | 
-						sed -n '/^.*<posts[^<]*count="\([0-9]*\)"[^>]*>.*$/{
+						out=`sed -n '/^.*<posts[^<]*count="\([0-9]*\)"[^>]*>.*$/{
 							s//mixed \1 /;
 							p;
 							}'`
@@ -504,7 +508,6 @@ engine_danbooru() {
 				"json")
 					parse() {
 					(
-						cat |
 						sed 's/^\[{//g;s/}\]$//g;' |
 						sed 's/},{/\
 /g;/^\[\]$/d'					| while read line; do
@@ -531,7 +534,6 @@ then one tag is not possible with json interface. Falling back to xml one."
 				;;
 			esac
 			type_format() {
-				cat | 
 				sed '	s/^0/general/;
 					s/^1/artist/;
 					s/^2/unknown/;
@@ -573,7 +575,7 @@ then one tag is not possible with json interface. Falling back to xml one."
 				"xml")
 					parse() {
 					(
-						cat | sed -n '/.*<post [ ]*/{s///;s|/>$||;p;}' |
+						sed -n '/.*<post [ ]*/{s///;s|/>$||;p;}' |
 						while read line; do
 							post_rating="`printf "%s\n" "${line}" | 
 							sed 's/.*rating=\"\([^\"]*\)\".*/\1/g;
@@ -600,7 +602,6 @@ then one tag is not possible with json interface. Falling back to xml one."
 				"json")
 					parse() {
 					(
-						cat |
 						sed 's/^\[{//g;s/}\]$//g;' |
 						sed 's/},{/\
 /g;/^\[\]$/d'					| while read line; do
@@ -693,8 +694,7 @@ engine_gelbooru() {
 					(
 						name="$1"
 						shift
-						out="`cat | 
-						sed -n '/^.*<posts[^<]*count="\([0-9]*\)"[^>]*>.*$/{
+						out="`sed -n '/^.*<posts[^<]*count="\([0-9]*\)"[^>]*>.*$/{
 							s//mixed \1 /;
 							p;
 							}'`"
@@ -724,7 +724,7 @@ engine_gelbooru() {
 				"xml")
 					parse() {
 					(
-						cat | sed -n '/.*<post [ ]*/{s///;s|/>$||;p;}' |
+						sed -n '/.*<post [ ]*/{s///;s|/>$||;p;}' |
 						while read line; do
 							post_rating="`printf "%s\n" "${line}" | 
 							sed 's/.*rating=\"\([^\"]*\)\".*/\1/g;
