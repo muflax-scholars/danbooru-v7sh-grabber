@@ -177,7 +177,7 @@ PATH="${PATH}:/usr/sfw/bin"
 export PATH
 
 # global
-g_version="Danbooru v7sh grabber v0.20.14 for Danbooru API v1.13.0"
+g_version="Danbooru v7sh grabber v0.20.15 for Danbooru API v1.13.0"
 # strings
 s_tag_list=""
 s_verbose="`get_single_opt "--verbose" "-v" "$@"`"
@@ -707,6 +707,8 @@ engine_gelbooru() {
 				;;
 			esac
 			query() {
+				query_type="$1"
+				shift
 				url_encoded_tags="$1"
 				shift
 				orderby="$1"
