@@ -5,8 +5,8 @@
 
 # i use `` instead of $() because solaris does not support $()'s
 
-# i also used some thing only because only it was compatible with solaris, but
-# i forgot which one
+# i also used some other thing only because it was compatible with solaris,
+# but i forgot which one
 
 # ############################ Core Functions Section ######################## #
 
@@ -17,7 +17,8 @@ log() {
 	format="$1"
 	shift
 	if printf "%s\n" "${s_verbose}" | 
-		grep -v "`printf "%s\n" "${type}" | sed 's/_part//'`" >/dev/null; then
+		grep -v "`printf "%s\n" "${type}" | 
+			sed 's/_part//'`" >/dev/null; then
 		return 1
 	fi
 	case "${type}" in
@@ -177,7 +178,7 @@ PATH="${PATH}:/usr/sfw/bin"
 export PATH
 
 # global
-g_version="Danbooru v7sh grabber v0.20.15 for Danbooru API v1.13.0"
+g_version="Danbooru v7sh grabber v0.20.16 for Danbooru API v1.13.0"
 # strings
 s_tag_list=""
 s_verbose="`get_single_opt "--verbose" "-v" "$@"`"
