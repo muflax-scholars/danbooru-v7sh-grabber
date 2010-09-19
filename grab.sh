@@ -142,7 +142,7 @@ USAGE: $0 [OPTIONS] <tagA1[ tagA2 ...][, tagB1 ...]>
 	-v 	--version		Script Version
 	-d	--download		Download tags instead of searching them
 	-e	--engine		Danbooru engine, danbooru or gelbooru
-	-u	--user			Your danbooru usrname
+	-u	--username		Your danbooru usrname
 	-p	--password		Your danbooru password
 	-du	--danbooru-url		Danbooru url
 	-i	--interface		Interface, 'xml' or 'json' for danbooru
@@ -172,7 +172,7 @@ PATH="${PATH}:/usr/sfw/bin"
 export PATH
 
 # global
-g_version="Danbooru v7sh grabber v0.20.7 for Danbooru API v1.13.0"
+g_version="Danbooru v7sh grabber v0.20.8 for Danbooru API v1.13.0"
 # strings
 s_tag_list=""
 s_verbose="`get_single_opt "--verbose" "-v" "$@"`"
@@ -190,7 +190,7 @@ l_search_limit="0"
 l_download_limit="100"
 l_download_mode="onedir" # currentdir, many
 l_page="1"
-l_used_binaries_list="[ printf cat grep sed od dd"
+l_used_binaries_list="[ printf cat grep sed od dd awk"
 l_supported_downloaders_list="`get_single_opt "--binary-downloader" "-bd" "$@"` wget curl axel fetch"
 l_supported_sha1_hashers_list="sha1 sha1sum"
 #binaries
@@ -259,7 +259,7 @@ while [ ! -z "$1" ]; do
 			l_engine="$2"
 		 	[ ! -z "$2" ] && shift
 		;;
-		"-u" | "--user")
+		"-u" | "--username")
 			s_username="$2"
 		 	[ ! -z "$2" ] && shift
 		;;
@@ -903,7 +903,7 @@ case "${l_mode}" in
 				done
 				page="`expr "${page}" + 1`"
 			done
-			log "message" "End grabbing for tags '%s'\n" ${tag_group}
+			log "message" "End grabbing for tags '%s'\n" "${tag_group}"
 		)
 		}
 	;;
@@ -918,8 +918,8 @@ case "${l_engine}" in
 	;;
 esac
 
+set -f
 IFS=","
-
 for tag_group in ${s_tag_list}; do
 	IFS=" "
 	process "${tag_group}"
