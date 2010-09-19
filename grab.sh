@@ -17,7 +17,7 @@ log() {
 	format="$1"
 	shift
 	if printf "%s\n" "${s_verbose}" | 
-		grep -v "`printf "%s\n" "${type}" | 
+		grep -v -- "`printf "%s\n" "${type}" | 
 			sed 's/_part//'`" >/dev/null; then
 		return 1
 	fi
@@ -178,7 +178,7 @@ PATH="${PATH}:/usr/sfw/bin"
 export PATH
 
 # global
-g_version="Danbooru v7sh grabber v0.20.16 for Danbooru API v1.13.0"
+g_version="Danbooru v7sh grabber v0.20.17 for Danbooru API v1.13.0"
 # strings
 s_tag_list=""
 s_verbose="`get_single_opt "--verbose" "-v" "$@"`"
