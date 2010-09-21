@@ -8,6 +8,55 @@
 # i also used some other thing only because it was compatible with solaris,
 # but i forgot which one
 
+# 1.  Script scheme:
+# 1.1 <Core Functions Section>
+# 1.2 <Init Section>
+# 1.3 <Options Parse Section>
+# 1.4 <Variable Validation Checks>
+# 2.  Engines:
+# 2.1 <Danbooru Engine>
+# 2.2 <Gelbooru Engine>
+# 3.  Main:
+# 3.1 <Main Section>
+
+# Main Data flow:
+
+# 001. First, functions in <Core Functions Section> are defined.
+# There are nine of them and all must be defined _before_ <Init Section>
+# 002. Then starts <Init Section>, where global variables are defined
+# 003. After defining default values of global variables, 
+# <Options Parse Section> starts, re-defining global variables by user input
+# command-line arguments and setting ${s_tag_list} variable with specified tags.
+# ${l_mode} set to 'download' or 'search'.
+# ${l_engine} set to 'danbooru' or 'gelbooru'.
+# 004. After patsing command-line options sanity check are executing, testing
+# validity of specified values
+# 005. Engine query() function is defined. More on that later.
+# 006. process() function is defined.
+# case "${l_mode}" in 
+#	  "search") process() for search is defined ;;
+#	"download") process() for download is defined ;;
+# esac
+# 007. query() function is defined
+# case "${l_engine}" in
+# 	"danbooru")
+#		case "${l_mode}" in
+#			  "search") query() for danbooru search is defined ;;
+#			"download") query() for danbooru download is defined ;;
+#		esac
+#        ;;
+# 	"gelbooru")
+#		case "${l_mode}" in
+#			  "search") query() for gelbooru search is defined ;;
+#			"download") query() for gelbooru download is defined ;;
+#		esac
+#        ;;
+# esac
+# 008. ${s_tag_list} splitting to ${tag_group}'s by ',' (coma) symbol.
+# 009. For each ${tag_group} `process "${tag_group}"` is executed
+# 010. process() calling query() function and parses it's output
+
+
 # ############################ Core Functions Section ######################## #
 
 log() {
@@ -178,7 +227,7 @@ PATH="${PATH}:/usr/sfw/bin"
 export PATH
 
 # global
-g_version="Danbooru v7sh grabber v0.20.17 for Danbooru API v1.13.0"
+g_version="Danbooru v7sh grabber v0.20.18 for Danbooru API v1.13.0"
 # strings
 s_tag_list=""
 s_verbose="`get_single_opt "--verbose" "-v" "$@"`"
@@ -224,7 +273,7 @@ for binary in ${l_used_binaries_list}; do
 	fi	
 done
 
-if [ "${s_not_found_binaries}" ]; then
+if [ ! -z "${s_not_found_binaries}" ]; then
 	log "error" "%s\n" "Folowing required binaries was not found \
 in your PATH directories: ${s_not_found_binaries}"
 	exit 1
