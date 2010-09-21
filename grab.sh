@@ -181,11 +181,27 @@ tags_urlencode() {
 )
 }
 
+hasher() {
+(
+	case "${b_hasher}" in
+		*"sha1sum")
+			sha1sum | awk '{print $1}'
+		;;
+		*"sha1")
+			sha1
+		;;
+		*"digest")
+			digest -a sha1
+		;;
+	esac
+)
+}
+
 password_hash() {
 (
 	password="$1"
 	shift
-	printf -- "${password}" | "${b_hasher}" | awk '{print $1}'
+	printf -- "${password}" | hasher | awk '{print $1}'
 )
 }
 
@@ -247,7 +263,7 @@ l_download_mode="onedir" # currentdir, many
 l_page="1"
 l_used_binaries_list="[ printf cat grep sed od dd awk"
 l_supported_downloaders_list="`get_single_opt "--binary-downloader" "-bd" "$@"` wget curl axel fetch"
-l_supported_sha1_hashers_list="sha1 sha1sum"
+l_supported_sha1_hashers_list="digest sha1 sha1sum"
 #binaries
 b_downloader="`get_binary ${l_supported_downloaders_list}`"
 b_hasher="`get_binary ${l_supported_sha1_hashers_list}`"
