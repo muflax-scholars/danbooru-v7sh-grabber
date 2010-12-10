@@ -243,7 +243,7 @@ PATH="${PATH}:/usr/sfw/bin"
 export PATH
 
 # global
-g_version="Danbooru v7sh grabber v0.20.18 for Danbooru API v1.13.0"
+g_version="Danbooru v7sh grabber v0.20.19 for Danbooru API v1.13.0"
 # strings
 s_tag_list=""
 s_verbose="`get_single_opt "--verbose" "-v" "$@"`"
@@ -857,7 +857,7 @@ engine_gelbooru() {
 				shift
 				limit="$1"
 				shift
-				downloader "${p_danbooru_url}/index.php?page=dapi&s=post&q=index&tags=${url_encoded_tags}&limit=${limit}" "${p_temp_query}"
+				downloader "${p_danbooru_url}/index.php?page=dapi&s=post&q=index&tags=${url_encoded_tags}&limit=${limit}&pid=${page}" "${p_temp_query}"
 				printf "\n" >> "${p_temp_query}"
 				cat -- "${p_temp_query}" | parse
 				rm -- "${p_temp_query}"
