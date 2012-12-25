@@ -2,7 +2,6 @@
 # LICENSE: WTFPLv2
 #                               (c) Aleksander Tumin <itakingiteasy@gmail.com>
 
-
 # i use `` instead of $() because solaris does not support $()'s
 
 # i also used some other thing only because it was compatible with solaris,
@@ -921,6 +920,9 @@ case "${l_mode}" in
 					if [ -f "${file_path}" ]; then
 						printf "%s\n" "skip"
 						return 0
+					fi
+					if printf "%s\n" "${file_url}" | grep '^/' >/dev/null; then
+						file_url="${p_danbooru_url}${file_url}"
 					fi
 					downloader "${file_url}" "${p_temp_image}"
 					mv -- "${p_temp_image}" "${file_path}"
