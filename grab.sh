@@ -74,7 +74,7 @@ log() {
 		"notice_part") printf -- "${format}" "$@" 1>&2; ;;
 		"error") printf "%s ${format}" "[Error]" "$@" 1>&2; ;;
 		"error_part") printf -- "${format}" "$@" 1>&2; ;;
-		"debug") printf "%s ${format}" "[Debug]" "$@" 1>&2; ;;
+		# "debug") printf "%s ${format}" "[Debug]" "$@" 1>&2; ;;
 		"debug_part") printf -- "${format}" "$@" 1>&2; ;;
 		"message") printf -- "${format}" "$@" 1>&2 ;;
 		"export") printf -- "${format}" "$@"; ;;
@@ -913,7 +913,7 @@ case "${l_mode}" in
 					post_count="$1"
 					shift
 					post_count_length="`printf "%s" "${post_count}" | wc -c | awk '{print $1}'`"					
-					log "message" "    Downloading file %s (%0${post_count_length}d/%d)..." "${file_name}" "${post_number}" "${post_count}"
+					# log "message" "    Downloading file %s (%0${post_count_length}d/%d)..." "${file_name}" "${post_number}" "${post_count}"
 					download_dir_name="_raw"
 					tag_dir_name="`printf "%s\n" "${tag_group}" | sed 's/ /-/g;s|/||g;s|\\\||g;'`"
 					mkdir -p -- "${tag_dir_name}"
@@ -921,7 +921,7 @@ case "${l_mode}" in
 					raw_file_path="${p_working_directory}/${download_dir_name}/${file_name}"
 					tag_file_path="${p_working_directory}/${tag_dir_name}/${file_name}"
 					if [ -f "${raw_file_path}" ]; then
-						printf "%s " "skip dl"
+						log "debug" "%s " "skip dl"
           else
 					  if printf "%s\n" "${file_url}" | grep '^/' >/dev/null; then
 						  file_url="${p_danbooru_url}${file_url}"
@@ -930,12 +930,12 @@ case "${l_mode}" in
 					  mv -- "${p_temp_image}" "${raw_file_path}"
 					fi
           if [ -f "${tag_file_path}" ]; then
-            printf "%s " "skip link"
+            log "debug" "%s " "skip link"
           else
             ln -s -- "${raw_file_path}" "${tag_file_path}"
           fi
 
-					log "message" "%s\n" "done"
+					log "debug" "%s\n" "done"
 				)
 				}
 			;;
