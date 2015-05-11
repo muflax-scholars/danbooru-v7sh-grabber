@@ -280,7 +280,7 @@ $(printf "%s\n" ${l_supported_downloaders_list} | tr ' ' '\n' | sort -u | tr '\n
 	exit 1
 fi
 
-log "notice" "%s\n" "Downloader found: ${b_downloader}"
+log "debug" "%s\n" "Downloader found: ${b_downloader}"
 
 for binary in ${l_used_binaries_list}; do
 	if [ ! "`command -v "${binary}"`" ]; then
