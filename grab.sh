@@ -759,10 +759,10 @@ engine_gelbooru() {
 					(
 						name="$1"
 						shift
-						out="`sed -n '/^.*<posts[^<]*count="\([0-9]*\)"[^>]*>.*$/{
+						out="$(sed -n '/^.*<posts[^<]*count="\([0-9]*\)"[^>]*>.*$/{
 							s//mixed \1 /;
 							p;
-							}'`"
+							}')"
 						if [ ! -z "${out}" ]; then
 							printf "%s" "${out}"
 							printf "%s\n" "${name}"
@@ -975,7 +975,7 @@ case "${l_mode}" in
 					set -- ${line}
 					file_url="$1"
 					shift
-					file_name="`printf "%s\n" "$@" | sed 's|/||g;s|\\\||g;'`"
+					file_name="`printf "%s\n" "$@" | sed 's|/||g;s|\\\||g;' | sed 's/jpeg$/jpg/'`"
 					shift	
 					process_files "${file_url}" "${file_name}" "${post_number}" "${post_count}" "${post_count_length}"
 					post_number="`expr "${post_number}" + 1`"
